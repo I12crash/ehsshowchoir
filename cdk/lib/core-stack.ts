@@ -57,7 +57,7 @@ export class CoreStack extends Stack {
     });
 
     // Buckets
-    const siteBucket = new s3.Bucket(this, 'SiteBucket', { websiteIndexDocument: 'index.html', publicReadAccess: false });
+    const siteBucket = new s3.Bucket(this, 'SiteBucket', { publicReadAccess: false });
     const uploadsBucket = new s3.Bucket(this, 'UploadsBucket', {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       enforceSSL: true,
@@ -65,9 +65,9 @@ export class CoreStack extends Stack {
       autoDeleteObjects: false
     });
 
-    // CloudFront for static site
+    // CloudFront for static site (use new S3BucketOrigin to avoid deprecation)
     const distro = new cloudfront.Distribution(this, 'SiteDistro', {
-      defaultBehavior: { origin: new origins.S3Origin(siteBucket) }
+      defaultBehavior: { origin: new origins.S3BucketOrigin(siteBucket) }
     });
 
     // Lambdas env
@@ -75,24 +75,25 @@ export class CoreStack extends Stack {
       TABLE_NAME: table.tableName,
       USER_POOL_ID: userPool.userPoolId,
       UPLOADS_BUCKET: uploadsBucket.bucketName,
-      DEFAULT_SEASON: '2025-2026'
+      DEFAULT_SEASON: '2025-2026',
+      TREASURER_EMAIL: 'treasurer@example.com'
     };
 
     const getInvoiceFn = new lambda.NodejsFunction(this, 'GetInvoiceFn', {
-      entry: 'lambda/get-invoice.ts',
-      bundling: { minify: true, externalModules: [], },
+      entry: '../lambda/get-invoice.ts',
+      bundling: { minify: true },
       environment: commonEnv,
     });
     table.grantReadData(getInvoiceFn);
 
     const contactFn = new lambda.NodejsFunction(this, 'ContactFn', {
-      entry: 'lambda/contact-treasurer.ts',
-      bundling: { minify: true, externalModules: [], },
+      entry: '../lambda/contact-treasurer.ts',
+      bundling: { minify: true },
       environment: commonEnv
     });
 
     const uploadEtlFn = new lambda.NodejsFunction(this, 'AdminUploadLedgerFn', {
-      entry: 'lambda/admin-upload-ledger.ts',
+      entry: '../lambda/admin-upload-ledger.ts',
       timeout: Duration.seconds(60),
       memorySize: 1024,
       bundling: { minify: true },

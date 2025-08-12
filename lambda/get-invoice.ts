@@ -7,12 +7,9 @@ const TABLE_NAME = process.env.TABLE_NAME!;
 const DEFAULT_SEASON = process.env.DEFAULT_SEASON || '2025-2026';
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
-  // In a real app, use JWT authorizer (Cognito) and claims.sub here.
-  // For sandbox, allow a query param ?parentSub=TEST (or use mock)
   const claims = (event.requestContext?.authorizer as any)?.jwt?.claims || {};
   const parentSub = claims?.sub || event.queryStringParameters?.parentSub || 'TEST-PARENT';
 
-  // Find linked students via GSI1 (GSI1PK = PARENT#<sub>, GSI1SK = LINK#<studentId>)
   const links = await ddb.send(new QueryCommand({
     TableName: TABLE_NAME,
     IndexName: 'GSI1',

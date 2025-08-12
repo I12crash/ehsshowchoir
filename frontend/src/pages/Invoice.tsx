@@ -22,8 +22,7 @@ export default function Invoice(){
           <div style={{marginTop:'.5rem'}}>
             <strong>Items:</strong>
             <ul>
-              {/* In this starter, invoice items may be stored as flat rows. */}
-              <li>See DynamoDB records with PK=STUDENT#ID, SK=INVOICE#SEASON</li>
+              <li>In this starter, items are flattened; see DynamoDB rows with PK=STUDENT#ID, SK=INVOICE#SEASON</li>
             </ul>
           </div>
         </div>

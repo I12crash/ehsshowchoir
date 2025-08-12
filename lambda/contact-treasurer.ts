@@ -13,7 +13,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const html = `<p>From: ${fromEmail}</p><p>Student: ${studentId || 'N/A'}</p><p>Message:</p><pre>${message}</pre>`;
 
   await ses.send(new SendEmailCommand({
-    FromEmailAddress: toAddress, # for sandbox, SES often requires verified sender equals recipient
+    FromEmailAddress: toAddress,
     Destination: { ToAddresses: [toAddress] },
     Content: { Simple: { Subject: { Data: subject }, Body: { Html: { Data: html } } } }
   }));

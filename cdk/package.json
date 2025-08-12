@@ -1,6 +1,6 @@
 {
   "name": "show-choir-billing-cdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,7 +12,6 @@
     "aws-cdk-lib": "2.151.0",
     "constructs": "10.3.0",
     "typescript": "^5.4.0",
-    "ts-node": "^10.9.2",
     "@types/node": "^20.11.19",
     "esbuild": "^0.21.5"
   },

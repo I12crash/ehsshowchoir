@@ -1,7 +1,6 @@
 import { S3Event, S3Handler } from 'aws-lambda';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
-import { DynamoDBClient, PutItemCommand, QueryCommand } from '@aws-sdk/client-dynamodb';
-import { unmarshall } from '@aws-sdk/util-dynamodb';
+import { DynamoDBClient, PutItemCommand } from '@aws-sdk/client-dynamodb';
 import * as XLSX from 'xlsx';
 
 const s3 = new S3Client({});
@@ -10,9 +9,8 @@ const ddb = new DynamoDBClient({});
 const TABLE_NAME = process.env.TABLE_NAME!;
 const DEFAULT_SEASON = process.env.DEFAULT_SEASON || '2025-2026';
 
-// Configurable parsing
 const START_ROWS: Record<string, number> = { 'MW Ledger': 76, 'SL Ledger': 74, 'VO Ledger': 46 };
-const COLS = { castNumber: 'A', studentName: 'B', fee: 'E', credit: 'F' }; // adjust as needed
+const COLS = { castNumber: 'A', studentName: 'B', fee: 'E', credit: 'F' };
 const CHOIR_KEYS: Record<string, string> = { 'MW Ledger': 'MW', 'SL Ledger': 'SL', 'VO Ledger': 'VO' };
 
 async function streamToBuffer(stream: any): Promise<Buffer> {
@@ -35,14 +33,12 @@ export const handler: S3Handler = async (event: S3Event) => {
     const buf = await streamToBuffer(obj.Body as any);
     const wb = XLSX.read(buf, { type: 'buffer' });
 
-    // For each relevant sheet
     for (const sheetName of Object.keys(START_ROWS)) {
       const ws = wb.Sheets[sheetName];
       if (!ws) continue;
       const choir = CHOIR_KEYS[sheetName];
       const startRow = START_ROWS[sheetName];
 
-      // Scan rows until empty cast number is encountered for N consecutive rows
       let emptyCount = 0;
       for (let r = startRow; r < startRow + 1000; r++) {
         const castCell = ws[`${COLS.castNumber}${r}`];
@@ -63,41 +59,29 @@ export const handler: S3Handler = async (event: S3Event) => {
           emptyCount = 0;
         }
 
-        if (!castNumber) continue; // require cast number as the unique row key
+        if (!castNumber) continue;
 
-        // Build deterministic line-item IDs so updates are idempotent
+        const studentId = `CAST${castNumber}`;
         const lineId = `${choir}#CAST${castNumber}`;
 
-        // Lookup studentId by castNumber (this assumes you have pre-seeded a mapping)
-        // Option A: store mapping as STUDENT#<id> item with GSI1PK = CAST#<castNumber>
-        // For now, derive a fake studentId to show structure:
-        const studentId = `CAST${castNumber}`;
-
-        // Compose invoice item
         const items = [];
         if (fee) items.push({ type: 'fee', choir, desc: `${choir} Fee`, amount: Math.round(fee * 100) });
         if (credit) items.push({ type: 'credit', choir, desc: `${choir} Credit`, amount: Math.round(credit * 100) });
 
-        // One fee set per cast number rule: overwrite by idempotent key (lineId)
-        // We store/merge into invoice with PK=STUDENT#id, SK=INVOICE#season and a set of entries keyed by lineId
-        // Simpler starter approach: store separate rows per line item
         for (const it of items) {
-          const itemPk = { S: `STUDENT#${studentId}` };
-          const itemSk = { S: `INVOICE#${DEFAULT_SEASON}` };
           const entryId = `${lineId}#${it.type}`;
 
           await put({
             TableName: TABLE_NAME,
             Item: {
-              PK: itemPk,
-              SK: itemSk,
-              // Partitioned invoice with embedded itemsById is more typical, but for simplicity we keep flat records
-              GSI1PK: { S: `INVOICE#${DEFAULT_SEASON}` },
-              GSI1SK: { S: `STUDENT#${studentId}` },
+              PK: { S: `STUDENT#${studentId}` },
+              SK: { S: `INVOICE#${DEFAULT_SEASON}` },
+              GSI1PK: { S: `PARENT#TEST-PARENT` },  // placeholder link for sandbox
+              GSI1SK: { S: `LINK#${studentId}` },
               studentId: { S: studentId },
+              studentName: { S: studentName || '' },
               season: { S: DEFAULT_SEASON },
               choir: { S: choir },
-              studentName: { S: studentName || '' },
               entryId: { S: entryId },
               entryType: { S: it.type },
               desc: { S: it.desc },
