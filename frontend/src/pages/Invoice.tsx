@@ -1,55 +1,49 @@
 import { useEffect, useState } from 'react'
-import { getTokens, logout } from '../auth'
+import { getEmailFromToken } from '../auth'
 
 export default function Invoice(){
   const [data, setData] = useState<any>(null)
-  const tokens = getTokens();
-  const isAuthed = !!tokens?.id_token;
+  const [loading, setLoading] = useState(true)
+  const email = getEmailFromToken()
 
   useEffect(() => {
-    (async () => {
-      const base = import.meta.env.VITE_API_URL;
-      const headers: any = {};
-      let url = `${base}/me/invoice`;
+    const run = async () => {
+      const base = import.meta.env.VITE_API_URL
+      const url = email ? `${base}/me/invoice?parentEmail=${encodeURIComponent(email)}` : ''
+      if(!url){ setLoading(false); return }
+      const resp = await fetch(url)
+      const j = await resp.json()
+      setData(j)
+      setLoading(false)
+    }
+    run()
+  }, [email])
 
-      if (tokens?.id_token) {
-        headers['Authorization'] = `Bearer ${tokens.id_token}`;
-      } else {
-        const qp = new URLSearchParams({ parentSub: 'TEST-PARENT' });
-        url += `?${qp.toString()}`;
-      }
+  if(!email) return <div className="card"><p>Please sign in to view your student's invoices.</p></div>
+  if(loading) return <div className="card"><p>Loading…</p></div>
+  if(!data?.invoices?.length) return <div className="card"><p>No invoices found for {email}.</p></div>
 
-      const resp = await fetch(url, { headers });
-      setData(await resp.json())
-    })()
-  }, [isAuthed])
-
-  return (
-    <div>
-      <div style={{display:'flex', gap:'1rem', alignItems:'center'}}>
-        {isAuthed ? (
-          <>
-            <span>Signed in</span>
-            <button onClick={logout}>Logout</button>
-          </>
-        ) : (
-          <span>Not signed in (showing sandbox data)</span>
-        )}
-      </div>
-
-      {!data ? <p>Loading…</p> :
-        (!data.invoices || data.invoices.length === 0 ? <p>No invoices found.</p> :
-          <div>
-            <h2>Your Invoice(s) — {data.season}</h2>
-            {data.invoices.map((inv: any, idx: number) => (
-              <div key={idx} style={{border:'1px solid #ddd', padding:'1rem', margin:'1rem 0'}}>
-                <div><strong>Student:</strong> {inv.studentName || inv.studentId}</div>
-                <div><strong>Season:</strong> {inv.season}</div>
-              </div>
+  return <div className="card">
+    {data.invoices.map((inv:any) => (
+      <div key={inv.studentId} style={{marginBottom:'1rem'}}>
+        <h3 style={{margin:'0 0 .5rem'}}>Invoice — {inv.profile?.studentName || inv.studentId} <small>({inv.studentId})</small></h3>
+        <p><strong>Fees:</strong> ${(inv.totals.feeCents/100).toFixed(2)} &nbsp; <strong>Credits:</strong> ${(inv.totals.creditCents/100).toFixed(2)} &nbsp; <strong>Balance:</strong> ${(inv.totals.balanceCents/100).toFixed(2)}</p>
+        <table className="table">
+          <thead><tr><th>Date</th><th>Type</th><th>Season</th><th>Category</th><th>Description</th><th>Amount</th></tr></thead>
+          <tbody>
+            {inv.txns.map((t:any) => (
+              <tr key={t.SK}>
+                <td>{t.date}</td>
+                <td>{t.type}</td>
+                <td>{t.season}</td>
+                <td>{t.category}</td>
+                <td>{t.description}</td>
+                <td>${(t.amountCents/100).toFixed(2)}</td>
+              </tr>
             ))}
-          </div>
-        )
-      }
-    </div>
-  )
+          </tbody>
+        </table>
+      </div>
+    ))}
+  </div>
 }

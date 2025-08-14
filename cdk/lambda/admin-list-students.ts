@@ -1,32 +1,47 @@
+
 import { APIGatewayProxyHandlerV2 } from 'aws-lambda';
-import { DynamoDBClient, ScanCommand } from '@aws-sdk/client-dynamodb';
+import { DynamoDBClient, QueryCommand, ScanCommand } from '@aws-sdk/client-dynamodb';
 import { unmarshall } from '@aws-sdk/util-dynamodb';
+import { allowReadOnly } from './_auth';
 
 const ddb = new DynamoDBClient({});
 const TABLE_NAME = process.env.TABLE_NAME!;
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
-  const res = await ddb.send(new ScanCommand({
+  try { allowReadOnly(event); } catch (e:any) { return e; }
+
+  const outFmt = (event.queryStringParameters || {})['format'];
+
+  const res = await ddb.send(new QueryCommand({
     TableName: TABLE_NAME,
-    FilterExpression: "begins_with(#sk, :inv)",
-    ExpressionAttributeNames: { "#sk": "SK" },
-    ExpressionAttributeValues: { ":inv": { S: "INVOICE#" } },
-    ProjectionExpression: "studentId, studentName, choir"
+    IndexName: 'TypeIndex',
+    KeyConditionExpression: 'TYPE = :t',
+    ExpressionAttributeValues: { ':t': { S: 'PROFILE' } }
   }));
 
-  const items = (res.Items || []).map(i => unmarshall(i));
-  items.sort((a,b) => (a.studentName||'').localeCompare(b.studentName||''));
+  const students = (res.Items || []).map(unmarshall).map((x:any) => {
+    const cast = (x.studentId || '').split('CAST')[1] || '';
+    return {
+      studentId: x.studentId, studentName: x.studentName, choir: x.choir,
+      gender: x.gender, grade: x.grade, active: x.active !== false, castNumber: cast
+    };
+  });
 
-  const format = event.queryStringParameters?.format;
-  if (format === 'csv') {
-    const header = "student_id,student_name,choir\n";
-    const lines = items.map((x: any) => `${x.studentId || ''},${(x.studentName||'').replace(/,/g,' ')},${x.choir || ''}`).join("\n");
+  if (outFmt === 'csv') {
+    const header = "student_id,student_name,choir,gender,grade,cast_number,active\n";
+    const lines = students.map((x:any) =>
+      `${x.studentId},${(x.studentName||'').replace(/,/g,' ')},${x.choir||''},${x.gender||''},${x.grade ?? ''},${x.castNumber||''},${x.active}`
+    ).join("\n");
     return {
       statusCode: 200,
-      headers: { "Content-Type": "text/csv", "Content-Disposition": "attachment; filename=students.csv" },
-      body: header + lines
+      headers: { 'content-type': 'text/csv' },
+      body: header + lines + "\n"
     };
   }
 
-  return { statusCode: 200, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ students: items }) };
+  return {
+    statusCode: 200,
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ students })
+  };
 };

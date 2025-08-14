@@ -1,8 +1,7 @@
 {
   "name": "show-choir-billing-frontend",
-  "version": "0.2.0",
+  "version": "0.0.9",
   "private": true,
-  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -13,10 +12,9 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "typescript": "^5.4.5",
     "vite": "^5.2.0",
     "@types/react": "^18.2.66",
-    "@types/react-dom": "^18.2.22",
-    "typescript": "^5.4.0",
-    "@vitejs/plugin-react": "^4.3.1"
+    "@types/react-dom": "^18.2.22"
   }
 }

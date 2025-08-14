@@ -1,163 +1,238 @@
-import { Stack, StackProps, Duration, RemovalPolicy, CfnOutput } from 'aws-cdk-lib';
+
+import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-import * as cognito from 'aws-cdk-lib/aws-cognito';
-import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
-import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
-import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
-import * as lambda from 'aws-cdk-lib/aws-lambda-nodejs';
-import * as lambdaBase from 'aws-cdk-lib/aws-lambda';
+import * as path from 'path';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
-import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
+import * as apigw from 'aws-cdk-lib/aws-apigateway';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
 
-export class CoreStack extends Stack {
-  constructor(scope: Construct, id: string, props?: StackProps) {
+export class CoreStack extends cdk.Stack {
+  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const userPool = new cognito.UserPool(this, 'ParentsPool', {
-      selfSignUpEnabled: true,
-      signInAliases: { email: true },
-      standardAttributes: { email: { required: true, mutable: false } },
-      passwordPolicy: { minLength: 8, requireDigits: true, requireLowercase: true, requireUppercase: false, requireSymbols: false },
-      removalPolicy: RemovalPolicy.RETAIN,
-    });
-
-    const client = new cognito.UserPoolClient(this, 'WebClient', {
-      userPool,
-      generateSecret: false,
-      oAuth: {
-        flows: { authorizationCodeGrant: true, implicitCodeGrant: true },
-        callbackUrls: ['http://localhost:5173/callback', 'https://example.com/callback'],
-        logoutUrls: ['http://localhost:5173/', 'https://example.com/'],
-      },
-      supportedIdentityProviders: [cognito.UserPoolClientIdentityProvider.COGNITO],
-    });
-
-    const domain = new cognito.UserPoolDomain(this, 'Domain', {
-      userPool,
-      cognitoDomain: { domainPrefix: 'edgewood-choir-billing-test' },
-    });
-
-    const table = new dynamodb.Table(this, 'LedgerTable', {
+    // DynamoDB
+    const table = new dynamodb.Table(this, 'Table', {
       partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: RemovalPolicy.RETAIN,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
+
     table.addGlobalSecondaryIndex({
-      indexName: 'GSI1',
+      indexName: 'TypeIndex',
+      partitionKey: { name: 'TYPE', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'studentName', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    table.addGlobalSecondaryIndex({
+      indexName: 'EmailIndex',
       partitionKey: { name: 'GSI1PK', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'GSI1SK', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
     });
 
-    const siteBucket = new s3.Bucket(this, 'SiteBucket', {
-      websiteIndexDocument: 'index.html',
-      publicReadAccess: true,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ACLS,
-      removalPolicy: RemovalPolicy.RETAIN,
+    // Cognito
+    const userPool = new cognito.UserPool(this, 'UserPool', {
+      selfSignUpEnabled: true,
+      signInAliases: { email: true },
+      standardAttributes: { email: { required: true, mutable: false } },
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    const uploadsBucket = new s3.Bucket(this, 'UploadsBucket', {
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      enforceSSL: true,
-      removalPolicy: RemovalPolicy.RETAIN,
-      autoDeleteObjects: false,
+    const userPoolClient = new cognito.UserPoolClient(this, 'UserPoolClient', {
+      userPool,
+      authFlows: { userSrp: true },
+      oAuth: {
+        flows: { implicitCodeGrant: true },
+        scopes: [cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL, cognito.OAuthScope.PROFILE],
+        callbackUrls: ['http://localhost:5173/callback'],
+        logoutUrls: ['http://localhost:5173/'],
+      },
+      generateSecret: false,
+      preventUserExistenceErrors: true,
     });
 
-    const distro = new cloudfront.Distribution(this, 'SiteDistro', {
-      defaultBehavior: { origin: new origins.S3Origin(siteBucket) },
-      defaultRootObject: 'index.html',
+    const hostedDomainPrefix = 'edgewood-choir-billing-test'; // change if desired
+    const domain = userPool.addDomain('CognitoDomain', {
+      cognitoDomain: { domainPrefix: hostedDomainPrefix }
     });
 
-    const commonEnv = {
+    // Lambdas (project root set to cdk/ so bundler finds package.json)
+    const commonNodeOpts = {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      memorySize: 256,
+      projectRoot: path.join(__dirname, '..'),
+      depsLockFilePath: path.join(__dirname, '..', 'package-lock.json'),
+      bundling: {
+        target: 'node20',
+        externalModules: [],
+        nodeModules: [
+          '@aws-sdk/client-dynamodb',
+          '@aws-sdk/util-dynamodb',
+          '@aws-sdk/client-sesv2',
+          'exceljs',
+          'uuid'
+        ],
+        minify: true,
+        sourceMap: false,
+      }
+    };
+
+    const envVars = {
       TABLE_NAME: table.tableName,
-      USER_POOL_ID: userPool.userPoolId,
-      UPLOADS_BUCKET: uploadsBucket.bucketName,
-      DEFAULT_SEASON: '2025-2026',
-      TREASURER_EMAIL: 'showchoirtreasurer@gmail.com',
-      SANDBOX_PARENT_SUB: 'TEST-PARENT',
+      ADMIN_EMAIL: 'showchoirtreasurer@gmail.com',
+      READONLY_EMAILS: '', // comma separated
+      REGION: cdk.Stack.of(this).region
     };
 
-    const bundling: lambda.BundlingOptions = {
-      minify: true,
-      target: 'node20',
-      externalModules: ['aws-sdk'],
-      nodeModules: [
-        '@aws-sdk/client-dynamodb',
-        '@aws-sdk/util-dynamodb',
-        '@aws-sdk/client-sesv2',
-        '@aws-sdk/client-s3',
-        'exceljs',
-      ],
-      forceDockerBundling: true,
-    };
-
-    const getInvoiceFn = new lambda.NodejsFunction(this, 'GetInvoiceFn', {
-      entry: 'lambda/get-invoice.ts',
-      runtime: lambdaBase.Runtime.NODEJS_20_X,
-      bundling,
-      environment: commonEnv,
-      timeout: Duration.seconds(15),
-      memorySize: 256,
-    });
-    table.grantReadData(getInvoiceFn);
-
-    const contactFn = new lambda.NodejsFunction(this, 'ContactFn', {
-      entry: 'lambda/contact-treasurer.ts',
-      runtime: lambdaBase.Runtime.NODEJS_20_X,
-      bundling,
-      environment: commonEnv,
-      timeout: Duration.seconds(15),
-      memorySize: 256,
+    const getInvoiceFn = new NodejsFunction(this, 'GetInvoiceFn', {
+      entry: path.join(__dirname, '..', 'lambda', 'get-invoice.ts'),
+      ...commonNodeOpts,
+      environment: envVars
     });
 
-    const adminListStudentsFn = new lambda.NodejsFunction(this, 'AdminListStudentsFn', {
-      entry: 'lambda/admin-list-students.ts',
-      runtime: lambdaBase.Runtime.NODEJS_20_X,
-      bundling,
-      environment: commonEnv,
-      timeout: Duration.seconds(15),
-      memorySize: 256,
+    const contactTreasurerFn = new NodejsFunction(this, 'ContactTreasurerFn', {
+      entry: path.join(__dirname, '..', 'lambda', 'contact-treasurer.ts'),
+      ...commonNodeOpts,
+      environment: envVars
     });
 
-    const uploadEtlFn = new lambda.NodejsFunction(this, 'AdminUploadLedgerFn', {
-      entry: 'lambda/admin-upload-ledger.ts',
-      runtime: lambdaBase.Runtime.NODEJS_20_X,
-      bundling,
-      environment: commonEnv,
-      timeout: Duration.seconds(60),
-      memorySize: 1024,
+    const adminListStudentsFn = new NodejsFunction(this, 'AdminListStudentsFn', {
+      entry: path.join(__dirname, '..', 'lambda', 'admin-list-students.ts'),
+      ...commonNodeOpts,
+      environment: envVars
     });
-    uploadsBucket.grantRead(uploadEtlFn);
-    table.grantReadWriteData(uploadEtlFn);
 
-    uploadsBucket.addEventNotification(s3.EventType.OBJECT_CREATED, new s3n.LambdaDestination(uploadEtlFn));
+    const adminUpsertStudentFn = new NodejsFunction(this, 'AdminUpsertStudentFn', {
+      entry: path.join(__dirname, '..', 'lambda', 'admin-upsert-student.ts'),
+      ...commonNodeOpts,
+      environment: envVars
+    });
 
-    contactFn.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['ses:SendEmail', 'ses:SendTemplatedEmail'],
-      resources: ['*'],
+    const adminDeleteStudentFn = new NodejsFunction(this, 'AdminDeleteStudentFn', {
+      entry: path.join(__dirname, '..', 'lambda', 'admin-delete-student.ts'),
+      ...commonNodeOpts,
+      environment: envVars
+    });
+
+    const adminTransactionFn = new NodejsFunction(this, 'AdminTransactionFn', {
+      entry: path.join(__dirname, '..', 'lambda', 'admin-transaction.ts'),
+      ...commonNodeOpts,
+      environment: envVars
+    });
+
+    const adminBatchChargeFn = new NodejsFunction(this, 'AdminBatchChargeFn', {
+      entry: path.join(__dirname, '..', 'lambda', 'admin-batch-charge.ts'),
+      ...commonNodeOpts,
+      environment: envVars
+    });
+
+    const adminParentLinkFn = new NodejsFunction(this, 'AdminParentLinkFn', {
+      entry: path.join(__dirname, '..', 'lambda', 'admin-parent-link.ts'),
+      ...commonNodeOpts,
+      environment: envVars
+    });
+
+    table.grantReadWriteData(getInvoiceFn);
+    table.grantReadWriteData(contactTreasurerFn);
+    table.grantReadWriteData(adminListStudentsFn);
+    table.grantReadWriteData(adminUpsertStudentFn);
+    table.grantReadWriteData(adminDeleteStudentFn);
+    table.grantReadWriteData(adminTransactionFn);
+    table.grantReadWriteData(adminBatchChargeFn);
+    table.grantReadWriteData(adminParentLinkFn);
+
+    contactTreasurerFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['ses:SendEmail','ses:SendRawEmail','ses:SendTemplatedEmail'],
+      resources: ['*']
     }));
 
-    const httpApi = new apigwv2.HttpApi(this, 'Api', {
-      corsPreflight: {
-        allowHeaders: ['Authorization','Content-Type'],
-        allowMethods: [apigwv2.CorsHttpMethod.GET, apigwv2.CorsHttpMethod.POST, apigwv2.CorsHttpMethod.OPTIONS],
-        allowOrigins: ['*'],
+    // API Gateway (REST)
+    const api = new apigw.RestApi(this, 'Api', {
+      restApiName: 'ShowChoirBilling',
+      defaultCorsPreflightOptions: {
+        allowOrigins: apigw.Cors.ALL_ORIGINS,
+        allowMethods: apigw.Cors.ALL_METHODS,
+        allowHeaders: ['*']
       }
     });
-    httpApi.addRoutes({ path: '/me/invoice', methods: [apigwv2.HttpMethod.GET], integration: new integrations.HttpLambdaIntegration('GetInvoiceInt', getInvoiceFn) });
-    httpApi.addRoutes({ path: '/contact/treasurer', methods: [apigwv2.HttpMethod.POST], integration: new integrations.HttpLambdaIntegration('ContactInt', contactFn) });
-    httpApi.addRoutes({ path: '/admin/students', methods: [apigwv2.HttpMethod.GET], integration: new integrations.HttpLambdaIntegration('AdminStudentsInt', adminListStudentsFn) });
 
-    new CfnOutput(this, 'HostedUIDomain', { value: `https://${domain.domainName}` });
-    new CfnOutput(this, 'UserPoolId', { value: userPool.userPoolId });
-    new CfnOutput(this, 'UserPoolClientId', { value: client.userPoolClientId });
-    new CfnOutput(this, 'ApiUrl', { value: httpApi.apiEndpoint });
-    new CfnOutput(this, 'SiteBucketName', { value: siteBucket.bucketName });
-    new CfnOutput(this, 'UploadsBucketName', { value: uploadsBucket.bucketName });
-    new CfnOutput(this, 'CloudFrontDomain', { value: distro.domainName });
-    new CfnOutput(this, 'CloudFrontDistributionId', { value: distro.distributionId });
+    // Cognito authorizer for admin
+    const authorizer = new apigw.CognitoUserPoolsAuthorizer(this, 'AdminAuthorizer', {
+      cognitoUserPools: [userPool],
+      identitySource: 'method.request.header.Authorization',
+    });
+
+    // Routes
+    const me = api.root.addResource('me');
+    const invoice = me.addResource('invoice');
+    invoice.addMethod('GET', new apigw.LambdaIntegration(getInvoiceFn));
+
+    const admin = api.root.addResource('admin');
+    const students = admin.addResource('students');
+    students.addMethod('GET', new apigw.LambdaIntegration(adminListStudentsFn), {
+      authorizer, authorizationType: apigw.AuthorizationType.COGNITO
+    });
+    students.addMethod('POST', new apigw.LambdaIntegration(adminUpsertStudentFn), {
+      authorizer, authorizationType: apigw.AuthorizationType.COGNITO
+    });
+    const studentId = students.addResource('{studentId}');
+    studentId.addMethod('DELETE', new apigw.LambdaIntegration(adminDeleteStudentFn), {
+      authorizer, authorizationType: apigw.AuthorizationType.COGNITO
+    });
+
+    const txn = admin.addResource('transaction');
+    txn.addMethod('POST', new apigw.LambdaIntegration(adminTransactionFn), {
+      authorizer, authorizationType: apigw.AuthorizationType.COGNITO
+    });
+
+    const batch = admin.addResource('batch').addResource('charge');
+    batch.addMethod('POST', new apigw.LambdaIntegration(adminBatchChargeFn), {
+      authorizer, authorizationType: apigw.AuthorizationType.COGNITO
+    });
+
+    const parentLink = admin.addResource('parent-link');
+    parentLink.addMethod('POST', new apigw.LambdaIntegration(adminParentLinkFn), {
+      authorizer, authorizationType: apigw.AuthorizationType.COGNITO
+    });
+
+    // Static site hosting
+    const siteBucket = new s3.Bucket(this, 'SiteBucket', {
+      websiteIndexDocument: 'index.html',
+      publicReadAccess: false,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+    });
+
+    const oai = new cloudfront.OriginAccessIdentity(this, 'OAI');
+    siteBucket.addToResourcePolicy(new iam.PolicyStatement({
+      actions: ['s3:GetObject'],
+      resources: [siteBucket.arnForObjects('*')],
+      principals: [new iam.CanonicalUserPrincipal(oai.cloudFrontOriginAccessIdentityS3CanonicalUserId)]
+    }));
+
+    const dist = new cloudfront.Distribution(this, 'SiteDistribution', {
+      defaultRootObject: 'index.html',
+      defaultBehavior: { origin: new origins.S3Origin(siteBucket, { originAccessIdentity: oai }) },
+      errorResponses: [
+        { httpStatus: 403, responseHttpStatus: 200, responsePagePath: '/index.html' },
+        { httpStatus: 404, responseHttpStatus: 200, responsePagePath: '/index.html' },
+      ]
+    });
+
+    new cdk.CfnOutput(this, 'ApiBaseUrl', { value: api.url?.slice(0, -1) || '' });
+    new cdk.CfnOutput(this, 'SiteBucketName', { value: siteBucket.bucketName });
+    new cdk.CfnOutput(this, 'CloudFrontDomain', { value: dist.distributionDomainName });
+    new cdk.CfnOutput(this, 'CloudFrontDistributionId', { value: dist.distributionId });
+    new cdk.CfnOutput(this, 'CognitoHostedDomain', { value: `${hostedDomainPrefix}.auth.${cdk.Stack.of(this).region}.amazoncognito.com` });
+    new cdk.CfnOutput(this, 'UserPoolClientId', { value: userPoolClient.userPoolClientId });
   }
 }

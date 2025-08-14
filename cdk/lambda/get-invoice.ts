@@ -1,34 +1,66 @@
+
 import { APIGatewayProxyHandlerV2 } from 'aws-lambda';
-import { DynamoDBClient, QueryCommand } from '@aws-sdk/client-dynamodb';
+import { DynamoDBClient, QueryCommand, GetItemCommand } from '@aws-sdk/client-dynamodb';
 import { unmarshall } from '@aws-sdk/util-dynamodb';
 
 const ddb = new DynamoDBClient({});
 const TABLE_NAME = process.env.TABLE_NAME!;
-const DEFAULT_SEASON = process.env.DEFAULT_SEASON || '2025-2026';
+
+function sumTxns(txns: any[]) {
+  let feeCents = 0, creditCents = 0;
+  for (const t of txns) {
+    if (t.type === 'fee') feeCents += t.amountCents || 0;
+    else if (t.type === 'credit') creditCents += t.amountCents || 0;
+  }
+  return { feeCents, creditCents, balanceCents: feeCents - creditCents };
+}
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
-  const claims = (event.requestContext?.authorizer as any)?.jwt?.claims || {};
-  const parentSub = claims?.sub || event.queryStringParameters?.parentSub || 'TEST-PARENT';
+  const qs = event.queryStringParameters || {};
+  const studentId = qs['studentId'];
+  const parentEmail = (qs['parentEmail'] || '').toLowerCase();
 
-  const links = await ddb.send(new QueryCommand({
-    TableName: TABLE_NAME,
-    IndexName: 'GSI1',
-    KeyConditionExpression: 'GSI1PK = :p and begins_with(GSI1SK, :l)',
-    ExpressionAttributeValues: { ':p': { S: `PARENT#${parentSub}` }, ':l': { S: 'LINK#' } },
-  }));
-  const studentIds = (links.Items || []).map(i => unmarshall(i).studentId);
-
-  const season = (event.queryStringParameters?.season) || DEFAULT_SEASON;
-  const invoices: any[] = [];
-  for (const sid of studentIds) {
-    const res = await ddb.send(new QueryCommand({
+  let studentIds: string[] = [];
+  if (studentId) {
+    studentIds = [studentId];
+  } else if (parentEmail) {
+    // find links by email
+    const linkRes = await ddb.send(new QueryCommand({
       TableName: TABLE_NAME,
-      KeyConditionExpression: 'PK = :pk and SK = :sk',
-      ExpressionAttributeValues: { ':pk': { S: `STUDENT#${sid}` }, ':sk': { S: `INVOICE#${season}` } },
+      IndexName: 'EmailIndex',
+      KeyConditionExpression: 'GSI1PK = :pk',
+      ExpressionAttributeValues: { ':pk': { S: `PARENT#${parentEmail}` } }
     }));
-    const item = res.Items?.[0] ? unmarshall(res.Items[0]) : null;
-    if (item) invoices.push(item);
+    const links = (linkRes.Items || []).map(unmarshall);
+    studentIds = links.map((x:any)=> (x.GSI1SK || '').replace('LINK#','')).filter(Boolean);
+  } else {
+    return { statusCode: 400, body: 'provide studentId or parentEmail' };
   }
 
-  return { statusCode: 200, body: JSON.stringify({ invoices, season }) };
+  const invoices: any[] = [];
+  for (const sid of studentIds) {
+    // query TXNs for sid
+    const txnRes = await ddb.send(new QueryCommand({
+      TableName: TABLE_NAME,
+      KeyConditionExpression: 'PK = :pk AND begins_with(SK, :s)',
+      ExpressionAttributeValues: { ':pk': { S: `STUDENT#${sid}` }, ':s': { S: 'TXN#' } }
+    }));
+    const txns = (txnRes.Items || []).map(unmarshall);
+    const totals = sumTxns(txns);
+
+    // get profile
+    const profRes = await ddb.send(new GetItemCommand({
+      TableName: TABLE_NAME,
+      Key: { PK: { S: `STUDENT#${sid}` }, SK: { S: 'PROFILE' } }
+    }));
+    const profile = profRes.Item ? unmarshall(profRes.Item) : { studentId: sid };
+
+    invoices.push({ studentId: sid, profile, txns, totals });
+  }
+
+  return {
+    statusCode: 200,
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ invoices })
+  };
 };

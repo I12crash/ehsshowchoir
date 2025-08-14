@@ -1,16 +1,15 @@
 import { useEffect } from 'react'
-import { parseHashTokens, saveTokens } from '../auth'
+import { parseHash, saveTokens } from '../auth'
 
 export default function Callback(){
   useEffect(() => {
-    const tokens = parseHashTokens(window.location.hash || '');
-    if(tokens.id_token){
-      saveTokens(tokens);
-      window.location.replace('/');
-    }else{
-      window.location.replace('/');
+    const tok = parseHash()
+    if(tok.id_token){
+      saveTokens(tok)
+      window.location.replace('/')
+    } else {
+      window.location.replace('/')
     }
-  }, []);
-
-  return <p>Signing you in…</p>
+  }, [])
+  return <p>Signing in…</p>
 }
