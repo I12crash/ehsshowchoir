@@ -1,4 +1,4 @@
-# Foster.dev AWS Application
+# edgewoodshowchoirpayments.org AWS Application
 
 A full-stack AWS application with CDK infrastructure, React frontend, and Cognito authentication.
 
