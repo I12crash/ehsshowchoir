@@ -82,7 +82,7 @@ export HOSTED_UI_PREFIX=foster-dev-auth
 - Check `stack-outputs.json` for CloudFront URL
 - Or run: `cat stack-outputs.json | jq -r .CloudFrontDomainName`
 
-## Domain Setup (foster.dev)
+## Domain Setup (edgewoodshowchoirpayments.org)
 
 ### ACM Certificate (us-east-1 for CloudFront)
 1. The CDK stack creates a certificate request in us-east-1
