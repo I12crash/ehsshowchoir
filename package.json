@@ -1,0 +1,20 @@
+{
+  "name": "foster-dev-app",
+  "version": "1.0.0",
+  "description": "Foster.dev AWS Application",
+  "private": true,
+  "scripts": {
+    "bootstrap": "./scripts/bootstrap.sh",
+    "deploy:infra": "./scripts/deploy-infra.sh",
+    "deploy:frontend": "./scripts/deploy-frontend.sh",
+    "destroy": "./scripts/destroy.sh",
+    "test": "cd cdk && npm test && cd ../frontend && npm test"
+  },
+  "workspaces": [
+    "cdk",
+    "frontend"
+  ],
+  "devDependencies": {
+    "@types/node": "^20.19.11"
+  }
+}

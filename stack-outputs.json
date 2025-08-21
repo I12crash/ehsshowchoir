@@ -1,0 +1,13 @@
+{
+  "UserPoolClientId": "3qkqbrq22fd26j7juu1la6spar",
+  "StudentsTableName": "choir-students",
+  "CloudFrontURL": "https://dzhs2bv4mkvzf.cloudfront.net",
+  "ApiUrl": "https://jivdvi90oc.execute-api.us-east-2.amazonaws.com/",
+  "UserPoolId": "us-east-2_X3aJynEck",
+  "CloudFrontDistributionId": "E2R6A5A8APQKBX",
+  "SiteBucketName": "foster-dev-site-636865837466-us-east-2",
+  "TransactionsTableName": "choir-transactions",
+  "ParentsTableName": "choir-parents",
+  "CloudFrontDomainName": "dzhs2bv4mkvzf.cloudfront.net",
+  "CognitoDomain": "foster-dev1755373542.auth.us-east-2.amazoncognito.com"
+}
