@@ -4,7 +4,7 @@
 
 set -e
 
-PROJECT_NAME="foster-dev-app"
+PROJECT_NAME="ehsshowchoir"
 echo "Creating $PROJECT_NAME project structure..."
 
 # Create main project directory
