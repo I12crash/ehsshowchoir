@@ -16,14 +16,14 @@
         "templateFile": "EhsShowchoirStack.template.json",
         "terminationProtection": false,
         "tags": {
-          "Environment": "Production",
-          "Owner": "EdgewoodShowChoir",
-          "Project": "EhsShowchoir"
+          "Environment": "production",
+          "Owner": "EHS Show Choir Team",
+          "Project": "EHS Show Choir"
         },
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::636865837466:role/cdk-hnb659fds-deploy-role-636865837466-us-east-2",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::636865837466:role/cdk-hnb659fds-cfn-exec-role-636865837466-us-east-2",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-636865837466-us-east-2/0d84310740753bdf3399d5031e9d732ff883f89f105eb37f6875dc9db83fdd74.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-636865837466-us-east-2/103614c154d705cf81c648fb72fe7a65428daf25efaa4e394869d70d61489ba2.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -45,15 +45,15 @@
             "data": [
               {
                 "Key": "Environment",
-                "Value": "Production"
+                "Value": "production"
               },
               {
                 "Key": "Owner",
-                "Value": "EdgewoodShowChoir"
+                "Value": "EHS Show Choir Team"
               },
               {
                 "Key": "Project",
-                "Value": "EhsShowchoir"
+                "Value": "EHS Show Choir"
               }
             ]
           }
@@ -100,6 +100,18 @@
             "data": "InvoicesBucket57FCB164"
           }
         ],
+        "/EhsShowchoirStack/Certificate/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "Certificate4E7ABB08"
+          }
+        ],
+        "/EhsShowchoirStack/Distribution/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "Distribution830FAC52"
+          }
+        ],
         "/EhsShowchoirStack/StudentsTable": [
           {
             "type": "aws:cdk:hasPhysicalName",
@@ -128,20 +140,6 @@
             "data": "PaymentHistoryTableB1149501"
           }
         ],
-        "/EhsShowchoirStack/InvoiceLogTable": [
-          {
-            "type": "aws:cdk:hasPhysicalName",
-            "data": {
-              "Ref": "InvoiceLogTable6D0E71B2"
-            }
-          }
-        ],
-        "/EhsShowchoirStack/InvoiceLogTable/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "InvoiceLogTable6D0E71B2"
-          }
-        ],
         "/EhsShowchoirStack/ParentStudentTable": [
           {
             "type": "aws:cdk:hasPhysicalName",
@@ -156,16 +154,24 @@
             "data": "ParentStudentTable1F3E1FD1"
           }
         ],
+        "/EhsShowchoirStack/InvoiceLogTable": [
+          {
+            "type": "aws:cdk:hasPhysicalName",
+            "data": {
+              "Ref": "InvoiceLogTable6D0E71B2"
+            }
+          }
+        ],
+        "/EhsShowchoirStack/InvoiceLogTable/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "InvoiceLogTable6D0E71B2"
+          }
+        ],
         "/EhsShowchoirStack/UserPool/Resource": [
           {
             "type": "aws:cdk:logicalId",
             "data": "UserPool6BA7E5F2"
-          }
-        ],
-        "/EhsShowchoirStack/UserPool/CognitoDomain/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "UserPoolCognitoDomainD6C7F9FA"
           }
         ],
         "/EhsShowchoirStack/UserPoolClient/Resource": [
@@ -174,52 +180,28 @@
             "data": "UserPoolClient2F5918F7"
           }
         ],
+        "/EhsShowchoirStack/UserPoolDomain/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "UserPoolDomain5479B217"
+          }
+        ],
         "/EhsShowchoirStack/LambdaRole/Resource": [
           {
             "type": "aws:cdk:logicalId",
             "data": "LambdaRole3A44B857"
           }
         ],
-        "/EhsShowchoirStack/ApiHandler/Resource": [
+        "/EhsShowchoirStack/StudentsLambda/Resource": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "ApiHandler5E7490E8"
+            "data": "StudentsLambdaB880940A"
           }
         ],
-        "/EhsShowchoirStack/ApiHandler/LogRetention/Resource": [
+        "/EhsShowchoirStack/PaymentsLambda/Resource": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "ApiHandlerLogRetention907E318F"
-          }
-        ],
-        "/EhsShowchoirStack/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB"
-          }
-        ],
-        "/EhsShowchoirStack/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/DefaultPolicy/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB"
-          }
-        ],
-        "/EhsShowchoirStack/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A"
-          }
-        ],
-        "/EhsShowchoirStack/BulkInvoiceHandler/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "BulkInvoiceHandler55959176"
-          }
-        ],
-        "/EhsShowchoirStack/BulkInvoiceHandler/LogRetention/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "BulkInvoiceHandlerLogRetentionC79A65BE"
+            "data": "PaymentsLambda27AA6830"
           }
         ],
         "/EhsShowchoirStack/Api/Resource": [
@@ -231,7 +213,7 @@
         "/EhsShowchoirStack/Api/Deployment/Resource": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "ApiDeploymentB17BE62D87509517dab5fe5f373a418bfc97561c"
+            "data": "ApiDeploymentB17BE62Df85279285260494fbf76304c6541a093"
           }
         ],
         "/EhsShowchoirStack/Api/DeploymentStage.prod/Resource": [
@@ -250,36 +232,6 @@
           {
             "type": "aws:cdk:logicalId",
             "data": "ApiOPTIONS5886EA5D"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/health/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "Apihealth5CB7A415"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/health/OPTIONS/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ApihealthOPTIONS119B6E46"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/health/GET/ApiPermission.EhsShowchoirStackApi62088C04.GET..health": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ApihealthGETApiPermissionEhsShowchoirStackApi62088C04GEThealthE24F6EFC"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/health/GET/ApiPermission.Test.EhsShowchoirStackApi62088C04.GET..health": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ApihealthGETApiPermissionTestEhsShowchoirStackApi62088C04GEThealthE68716BE"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/health/GET/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ApihealthGET8A9DC1E4"
           }
         ],
         "/EhsShowchoirStack/Api/Default/students/Resource": [
@@ -396,208 +348,52 @@
             "data": "ApistudentsstudentIdDELETE51D1B7FB"
           }
         ],
-        "/EhsShowchoirStack/Api/Default/students/{studentId}/invoice-data/Resource": [
+        "/EhsShowchoirStack/Api/Default/payments/Resource": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "ApistudentsstudentIdinvoicedataE970C213"
+            "data": "Apipayments63A247CD"
           }
         ],
-        "/EhsShowchoirStack/Api/Default/students/{studentId}/invoice-data/OPTIONS/Resource": [
+        "/EhsShowchoirStack/Api/Default/payments/OPTIONS/Resource": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "ApistudentsstudentIdinvoicedataOPTIONSF659A2B7"
+            "data": "ApipaymentsOPTIONS77BB5CA0"
           }
         ],
-        "/EhsShowchoirStack/Api/Default/students/{studentId}/invoice-data/GET/ApiPermission.EhsShowchoirStackApi62088C04.GET..students.{studentId}.invoice-data": [
+        "/EhsShowchoirStack/Api/Default/payments/GET/ApiPermission.EhsShowchoirStackApi62088C04.GET..payments": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "ApistudentsstudentIdinvoicedataGETApiPermissionEhsShowchoirStackApi62088C04GETstudentsstudentIdinvoicedataB0313FD0"
+            "data": "ApipaymentsGETApiPermissionEhsShowchoirStackApi62088C04GETpayments77D02CD1"
           }
         ],
-        "/EhsShowchoirStack/Api/Default/students/{studentId}/invoice-data/GET/ApiPermission.Test.EhsShowchoirStackApi62088C04.GET..students.{studentId}.invoice-data": [
+        "/EhsShowchoirStack/Api/Default/payments/GET/ApiPermission.Test.EhsShowchoirStackApi62088C04.GET..payments": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "ApistudentsstudentIdinvoicedataGETApiPermissionTestEhsShowchoirStackApi62088C04GETstudentsstudentIdinvoicedata6959D134"
+            "data": "ApipaymentsGETApiPermissionTestEhsShowchoirStackApi62088C04GETpaymentsAF1BBCD3"
           }
         ],
-        "/EhsShowchoirStack/Api/Default/students/{studentId}/invoice-data/GET/Resource": [
+        "/EhsShowchoirStack/Api/Default/payments/GET/Resource": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "ApistudentsstudentIdinvoicedataGETB39AF273"
+            "data": "ApipaymentsGET125774DF"
           }
         ],
-        "/EhsShowchoirStack/Api/Default/students/{studentId}/payment-history/Resource": [
+        "/EhsShowchoirStack/Api/Default/payments/POST/ApiPermission.EhsShowchoirStackApi62088C04.POST..payments": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "ApistudentsstudentIdpaymenthistoryE7DAFFCF"
+            "data": "ApipaymentsPOSTApiPermissionEhsShowchoirStackApi62088C04POSTpaymentsCEA801FB"
           }
         ],
-        "/EhsShowchoirStack/Api/Default/students/{studentId}/payment-history/OPTIONS/Resource": [
+        "/EhsShowchoirStack/Api/Default/payments/POST/ApiPermission.Test.EhsShowchoirStackApi62088C04.POST..payments": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "ApistudentsstudentIdpaymenthistoryOPTIONS39E6FB6E"
+            "data": "ApipaymentsPOSTApiPermissionTestEhsShowchoirStackApi62088C04POSTpaymentsD3220B90"
           }
         ],
-        "/EhsShowchoirStack/Api/Default/students/{studentId}/payment-history/GET/ApiPermission.EhsShowchoirStackApi62088C04.GET..students.{studentId}.payment-history": [
+        "/EhsShowchoirStack/Api/Default/payments/POST/Resource": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "ApistudentsstudentIdpaymenthistoryGETApiPermissionEhsShowchoirStackApi62088C04GETstudentsstudentIdpaymenthistory1A3C0796"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/students/{studentId}/payment-history/GET/ApiPermission.Test.EhsShowchoirStackApi62088C04.GET..students.{studentId}.payment-history": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ApistudentsstudentIdpaymenthistoryGETApiPermissionTestEhsShowchoirStackApi62088C04GETstudentsstudentIdpaymenthistoryD5EDA9F4"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/students/{studentId}/payment-history/GET/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ApistudentsstudentIdpaymenthistoryGET1E314884"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/invoices/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ApiinvoicesAD9AA2E2"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/invoices/OPTIONS/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ApiinvoicesOPTIONS7831A8EF"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/invoices/bulk-send/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ApiinvoicesbulksendA1FBBE63"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/invoices/bulk-send/OPTIONS/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ApiinvoicesbulksendOPTIONS64E26DC8"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/invoices/bulk-send/POST/ApiPermission.EhsShowchoirStackApi62088C04.POST..invoices.bulk-send": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ApiinvoicesbulksendPOSTApiPermissionEhsShowchoirStackApi62088C04POSTinvoicesbulksend29F33F55"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/invoices/bulk-send/POST/ApiPermission.Test.EhsShowchoirStackApi62088C04.POST..invoices.bulk-send": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ApiinvoicesbulksendPOSTApiPermissionTestEhsShowchoirStackApi62088C04POSTinvoicesbulksend03173BC7"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/invoices/bulk-send/POST/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ApiinvoicesbulksendPOSTBB30D550"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/invoices/generate-individual/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "Apiinvoicesgenerateindividual84E422D5"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/invoices/generate-individual/OPTIONS/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ApiinvoicesgenerateindividualOPTIONS0C82BEB7"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/invoices/generate-individual/POST/ApiPermission.EhsShowchoirStackApi62088C04.POST..invoices.generate-individual": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ApiinvoicesgenerateindividualPOSTApiPermissionEhsShowchoirStackApi62088C04POSTinvoicesgenerateindividual51EC28D8"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/invoices/generate-individual/POST/ApiPermission.Test.EhsShowchoirStackApi62088C04.POST..invoices.generate-individual": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ApiinvoicesgenerateindividualPOSTApiPermissionTestEhsShowchoirStackApi62088C04POSTinvoicesgenerateindividualD743E446"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/invoices/generate-individual/POST/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ApiinvoicesgenerateindividualPOSTCB952379"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/payment-history/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "Apipaymenthistory370FB0AD"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/payment-history/OPTIONS/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ApipaymenthistoryOPTIONS873861F5"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/payment-history/GET/ApiPermission.EhsShowchoirStackApi62088C04.GET..payment-history": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ApipaymenthistoryGETApiPermissionEhsShowchoirStackApi62088C04GETpaymenthistoryE4B045C7"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/payment-history/GET/ApiPermission.Test.EhsShowchoirStackApi62088C04.GET..payment-history": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ApipaymenthistoryGETApiPermissionTestEhsShowchoirStackApi62088C04GETpaymenthistory5B720F8B"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/payment-history/GET/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ApipaymenthistoryGET1A372C7E"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/payment-history/POST/ApiPermission.EhsShowchoirStackApi62088C04.POST..payment-history": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ApipaymenthistoryPOSTApiPermissionEhsShowchoirStackApi62088C04POSTpaymenthistory8F87C742"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/payment-history/POST/ApiPermission.Test.EhsShowchoirStackApi62088C04.POST..payment-history": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ApipaymenthistoryPOSTApiPermissionTestEhsShowchoirStackApi62088C04POSTpaymenthistory56735873"
-          }
-        ],
-        "/EhsShowchoirStack/Api/Default/payment-history/POST/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ApipaymenthistoryPOST9A17E45A"
-          }
-        ],
-        "/EhsShowchoirStack/Authorizer/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "AuthorizerBD825682"
-          }
-        ],
-        "/EhsShowchoirStack/Certificate/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "Certificate4E7ABB08"
-          }
-        ],
-        "/EhsShowchoirStack/OAI/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "OAIE1EFC67F"
-          }
-        ],
-        "/EhsShowchoirStack/Distribution/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "Distribution830FAC52"
+            "data": "ApipaymentsPOSTDC87FFD1"
           }
         ],
         "/EhsShowchoirStack/EmailIdentity/Resource": [
@@ -616,18 +412,6 @@
           {
             "type": "aws:cdk:logicalId",
             "data": "WebsiteBucketName"
-          }
-        ],
-        "/EhsShowchoirStack/InvoicesBucketName": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "InvoicesBucketName"
-          }
-        ],
-        "/EhsShowchoirStack/CloudFrontDomainName": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "CloudFrontDomainName"
           }
         ],
         "/EhsShowchoirStack/CloudFrontDistributionId": [
@@ -660,22 +444,28 @@
             "data": "CognitoDomain"
           }
         ],
-        "/EhsShowchoirStack/CertificateArn": [
+        "/EhsShowchoirStack/WebsiteUrl": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "CertificateArn"
+            "data": "WebsiteUrl"
           }
         ],
-        "/EhsShowchoirStack/StudentsTableName": [
+        "/EhsShowchoirStack/CloudFrontUrl": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "StudentsTableName"
+            "data": "CloudFrontUrl"
           }
         ],
-        "/EhsShowchoirStack/PaymentHistoryTableName": [
+        "/EhsShowchoirStack/Region": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "PaymentHistoryTableName"
+            "data": "Region"
+          }
+        ],
+        "/EhsShowchoirStack/StackName": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "StackName"
           }
         ],
         "/EhsShowchoirStack/CDKMetadata/Default": [

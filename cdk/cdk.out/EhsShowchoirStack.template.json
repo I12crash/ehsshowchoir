@@ -1,26 +1,13 @@
 {
- "Description": "EHS Show Choir Payment System - Main Infrastructure",
+ "Description": "EHS Show Choir Payment System Infrastructure",
  "Resources": {
   "WebsiteBucket75C24D94": {
    "Type": "AWS::S3::Bucket",
    "Properties": {
-    "BucketName": "ehsshowchoir-website-636865837466-us-east-2",
-    "LifecycleConfiguration": {
-     "Rules": [
-      {
-       "Id": "DeleteOldVersions",
-       "NoncurrentVersionExpiration": {
-        "NoncurrentDays": 30
-       },
-       "Status": "Enabled"
-      }
-     ]
-    },
+    "BucketName": "ehsshowchoir-website-bucket",
     "PublicAccessBlockConfiguration": {
      "BlockPublicAcls": true,
-     "BlockPublicPolicy": true,
-     "IgnorePublicAcls": true,
-     "RestrictPublicBuckets": true
+     "IgnorePublicAcls": true
     },
     "Tags": [
      {
@@ -28,8 +15,9 @@
       "Value": "true"
      }
     ],
-    "VersioningConfiguration": {
-     "Status": "Enabled"
+    "WebsiteConfiguration": {
+     "ErrorDocument": "error.html",
+     "IndexDocument": "index.html"
     }
    },
    "UpdateReplacePolicy": "Delete",
@@ -46,6 +34,27 @@
     },
     "PolicyDocument": {
      "Statement": [
+      {
+       "Action": "s3:GetObject",
+       "Effect": "Allow",
+       "Principal": {
+        "AWS": "*"
+       },
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          {
+           "Fn::GetAtt": [
+            "WebsiteBucket75C24D94",
+            "Arn"
+           ]
+          },
+          "/*"
+         ]
+        ]
+       }
+      },
       {
        "Action": [
         "s3:DeleteObject*",
@@ -84,70 +93,6 @@
          ]
         }
        ]
-      },
-      {
-       "Action": [
-        "s3:GetBucket*",
-        "s3:GetObject*",
-        "s3:List*"
-       ],
-       "Effect": "Allow",
-       "Principal": {
-        "CanonicalUser": {
-         "Fn::GetAtt": [
-          "OAIE1EFC67F",
-          "S3CanonicalUserId"
-         ]
-        }
-       },
-       "Resource": [
-        {
-         "Fn::GetAtt": [
-          "WebsiteBucket75C24D94",
-          "Arn"
-         ]
-        },
-        {
-         "Fn::Join": [
-          "",
-          [
-           {
-            "Fn::GetAtt": [
-             "WebsiteBucket75C24D94",
-             "Arn"
-            ]
-           },
-           "/*"
-          ]
-         ]
-        }
-       ]
-      },
-      {
-       "Action": "s3:GetObject",
-       "Effect": "Allow",
-       "Principal": {
-        "CanonicalUser": {
-         "Fn::GetAtt": [
-          "OAIE1EFC67F",
-          "S3CanonicalUserId"
-         ]
-        }
-       },
-       "Resource": {
-        "Fn::Join": [
-         "",
-         [
-          {
-           "Fn::GetAtt": [
-            "WebsiteBucket75C24D94",
-            "Arn"
-           ]
-          },
-          "/*"
-         ]
-        ]
-       }
       }
      ],
      "Version": "2012-10-17"
@@ -246,36 +191,16 @@
   "InvoicesBucket57FCB164": {
    "Type": "AWS::S3::Bucket",
    "Properties": {
-    "BucketName": "ehsshowchoir-invoices-636865837466-us-east-2",
-    "LifecycleConfiguration": {
-     "Rules": [
+    "BucketEncryption": {
+     "ServerSideEncryptionConfiguration": [
       {
-       "Id": "ArchiveOldInvoices",
-       "Status": "Enabled",
-       "Transitions": [
-        {
-         "StorageClass": "STANDARD_IA",
-         "TransitionInDays": 90
-        },
-        {
-         "StorageClass": "GLACIER",
-         "TransitionInDays": 365
-        }
-       ]
-      },
-      {
-       "ExpirationInDays": 2555,
-       "Id": "DeleteVeryOldInvoices",
-       "Status": "Enabled"
+       "ServerSideEncryptionByDefault": {
+        "SSEAlgorithm": "AES256"
+       }
       }
      ]
     },
-    "PublicAccessBlockConfiguration": {
-     "BlockPublicAcls": true,
-     "BlockPublicPolicy": true,
-     "IgnorePublicAcls": true,
-     "RestrictPublicBuckets": true
-    },
+    "BucketName": "ehsshowchoir-invoices",
     "VersioningConfiguration": {
      "Status": "Enabled"
     }
@@ -286,69 +211,110 @@
     "aws:cdk:path": "EhsShowchoirStack/InvoicesBucket/Resource"
    }
   },
+  "Certificate4E7ABB08": {
+   "Type": "AWS::CertificateManager::Certificate",
+   "Properties": {
+    "DomainName": "edgewoodshowchoirpayments.org",
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "EhsShowchoirStack/Certificate"
+     }
+    ],
+    "ValidationMethod": "DNS"
+   },
+   "Metadata": {
+    "aws:cdk:path": "EhsShowchoirStack/Certificate/Resource"
+   }
+  },
+  "Distribution830FAC52": {
+   "Type": "AWS::CloudFront::Distribution",
+   "Properties": {
+    "DistributionConfig": {
+     "Aliases": [
+      "edgewoodshowchoirpayments.org"
+     ],
+     "Comment": "EHS Show Choir Payment System Distribution",
+     "CustomErrorResponses": [
+      {
+       "ErrorCode": 404,
+       "ResponseCode": 200,
+       "ResponsePagePath": "/index.html"
+      }
+     ],
+     "DefaultCacheBehavior": {
+      "AllowedMethods": [
+       "GET",
+       "HEAD",
+       "OPTIONS"
+      ],
+      "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6",
+      "Compress": true,
+      "TargetOriginId": "EhsShowchoirStackDistributionOrigin1EE09CE1D",
+      "ViewerProtocolPolicy": "redirect-to-https"
+     },
+     "DefaultRootObject": "index.html",
+     "Enabled": true,
+     "HttpVersion": "http2",
+     "IPV6Enabled": true,
+     "Origins": [
+      {
+       "CustomOriginConfig": {
+        "OriginProtocolPolicy": "http-only",
+        "OriginSSLProtocols": [
+         "TLSv1.2"
+        ]
+       },
+       "DomainName": {
+        "Fn::Select": [
+         2,
+         {
+          "Fn::Split": [
+           "/",
+           {
+            "Fn::GetAtt": [
+             "WebsiteBucket75C24D94",
+             "WebsiteURL"
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       "Id": "EhsShowchoirStackDistributionOrigin1EE09CE1D"
+      }
+     ],
+     "ViewerCertificate": {
+      "AcmCertificateArn": {
+       "Ref": "Certificate4E7ABB08"
+      },
+      "MinimumProtocolVersion": "TLSv1.2_2021",
+      "SslSupportMethod": "sni-only"
+     }
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "EhsShowchoirStack/Distribution/Resource"
+   }
+  },
   "StudentsTableDAB56938": {
    "Type": "AWS::DynamoDB::Table",
    "Properties": {
     "AttributeDefinitions": [
      {
-      "AttributeName": "id",
-      "AttributeType": "S"
-     },
-     {
-      "AttributeName": "parentEmail",
-      "AttributeType": "S"
-     },
-     {
-      "AttributeName": "status",
-      "AttributeType": "S"
-     },
-     {
-      "AttributeName": "createdAt",
+      "AttributeName": "studentId",
       "AttributeType": "S"
      }
     ],
     "BillingMode": "PAY_PER_REQUEST",
-    "GlobalSecondaryIndexes": [
-     {
-      "IndexName": "ParentEmailIndex",
-      "KeySchema": [
-       {
-        "AttributeName": "parentEmail",
-        "KeyType": "HASH"
-       }
-      ],
-      "Projection": {
-       "ProjectionType": "ALL"
-      }
-     },
-     {
-      "IndexName": "StatusIndex",
-      "KeySchema": [
-       {
-        "AttributeName": "status",
-        "KeyType": "HASH"
-       },
-       {
-        "AttributeName": "createdAt",
-        "KeyType": "RANGE"
-       }
-      ],
-      "Projection": {
-       "ProjectionType": "ALL"
-      }
-     }
-    ],
     "KeySchema": [
      {
-      "AttributeName": "id",
+      "AttributeName": "studentId",
       "KeyType": "HASH"
      }
     ],
     "PointInTimeRecoverySpecification": {
      "PointInTimeRecoveryEnabled": true
-    },
-    "StreamSpecification": {
-     "StreamViewType": "NEW_AND_OLD_IMAGES"
     },
     "TableName": "ehsshowchoir-students"
    },
@@ -363,72 +329,27 @@
    "Properties": {
     "AttributeDefinitions": [
      {
-      "AttributeName": "id",
+      "AttributeName": "paymentId",
       "AttributeType": "S"
      },
      {
-      "AttributeName": "transaction_date",
-      "AttributeType": "S"
-     },
-     {
-      "AttributeName": "student_id",
-      "AttributeType": "S"
-     },
-     {
-      "AttributeName": "parent_email",
+      "AttributeName": "timestamp",
       "AttributeType": "S"
      }
     ],
     "BillingMode": "PAY_PER_REQUEST",
-    "GlobalSecondaryIndexes": [
-     {
-      "IndexName": "StudentIdIndex",
-      "KeySchema": [
-       {
-        "AttributeName": "student_id",
-        "KeyType": "HASH"
-       },
-       {
-        "AttributeName": "transaction_date",
-        "KeyType": "RANGE"
-       }
-      ],
-      "Projection": {
-       "ProjectionType": "ALL"
-      }
-     },
-     {
-      "IndexName": "ParentEmailIndex",
-      "KeySchema": [
-       {
-        "AttributeName": "parent_email",
-        "KeyType": "HASH"
-       },
-       {
-        "AttributeName": "transaction_date",
-        "KeyType": "RANGE"
-       }
-      ],
-      "Projection": {
-       "ProjectionType": "ALL"
-      }
-     }
-    ],
     "KeySchema": [
      {
-      "AttributeName": "id",
+      "AttributeName": "paymentId",
       "KeyType": "HASH"
      },
      {
-      "AttributeName": "transaction_date",
+      "AttributeName": "timestamp",
       "KeyType": "RANGE"
      }
     ],
     "PointInTimeRecoverySpecification": {
      "PointInTimeRecoveryEnabled": true
-    },
-    "StreamSpecification": {
-     "StreamViewType": "NEW_AND_OLD_IMAGES"
     },
     "TableName": "ehsshowchoir-payment-history"
    },
@@ -438,63 +359,27 @@
     "aws:cdk:path": "EhsShowchoirStack/PaymentHistoryTable/Resource"
    }
   },
-  "InvoiceLogTable6D0E71B2": {
-   "Type": "AWS::DynamoDB::Table",
-   "Properties": {
-    "AttributeDefinitions": [
-     {
-      "AttributeName": "id",
-      "AttributeType": "S"
-     },
-     {
-      "AttributeName": "created_at",
-      "AttributeType": "S"
-     }
-    ],
-    "BillingMode": "PAY_PER_REQUEST",
-    "KeySchema": [
-     {
-      "AttributeName": "id",
-      "KeyType": "HASH"
-     },
-     {
-      "AttributeName": "created_at",
-      "KeyType": "RANGE"
-     }
-    ],
-    "TableName": "ehsshowchoir-invoice-log",
-    "TimeToLiveSpecification": {
-     "AttributeName": "ttl",
-     "Enabled": true
-    }
-   },
-   "UpdateReplacePolicy": "Retain",
-   "DeletionPolicy": "Retain",
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/InvoiceLogTable/Resource"
-   }
-  },
   "ParentStudentTable1F3E1FD1": {
    "Type": "AWS::DynamoDB::Table",
    "Properties": {
     "AttributeDefinitions": [
      {
-      "AttributeName": "parent_email",
+      "AttributeName": "parentEmail",
       "AttributeType": "S"
      },
      {
-      "AttributeName": "student_id",
+      "AttributeName": "studentId",
       "AttributeType": "S"
      }
     ],
     "BillingMode": "PAY_PER_REQUEST",
     "KeySchema": [
      {
-      "AttributeName": "parent_email",
+      "AttributeName": "parentEmail",
       "KeyType": "HASH"
      },
      {
-      "AttributeName": "student_id",
+      "AttributeName": "studentId",
       "KeyType": "RANGE"
      }
     ],
@@ -506,38 +391,79 @@
     "aws:cdk:path": "EhsShowchoirStack/ParentStudentTable/Resource"
    }
   },
+  "InvoiceLogTable6D0E71B2": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "invoiceId",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "KeySchema": [
+     {
+      "AttributeName": "invoiceId",
+      "KeyType": "HASH"
+     }
+    ],
+    "TableName": "ehsshowchoir-invoice-log"
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "EhsShowchoirStack/InvoiceLogTable/Resource"
+   }
+  },
   "UserPool6BA7E5F2": {
    "Type": "AWS::Cognito::UserPool",
    "Properties": {
     "AccountRecoverySetting": {
      "RecoveryMechanisms": [
       {
-       "Name": "verified_email",
+       "Name": "verified_phone_number",
        "Priority": 1
+      },
+      {
+       "Name": "verified_email",
+       "Priority": 2
       }
      ]
     },
     "AdminCreateUserConfig": {
-     "AllowAdminCreateUserOnly": false,
-     "InviteMessageTemplate": {
-      "EmailMessage": "Hello {username}, your temporary password is {####}",
-      "EmailSubject": "Welcome to Edgewood Show Choir Payment Portal"
-     }
+     "AllowAdminCreateUserOnly": false
     },
     "AutoVerifiedAttributes": [
      "email"
     ],
-    "EmailVerificationMessage": "Your verification code is {####}",
-    "EmailVerificationSubject": "Verify your email for Edgewood Show Choir",
+    "EmailVerificationMessage": "The verification code to your new account is {####}",
+    "EmailVerificationSubject": "Verify your new account",
     "Policies": {
      "PasswordPolicy": {
       "MinimumLength": 8,
       "RequireLowercase": true,
       "RequireNumbers": true,
-      "RequireSymbols": true,
+      "RequireSymbols": false,
       "RequireUppercase": true
      }
     },
+    "Schema": [
+     {
+      "Mutable": true,
+      "Name": "email",
+      "Required": true
+     },
+     {
+      "Mutable": true,
+      "Name": "given_name",
+      "Required": true
+     },
+     {
+      "Mutable": true,
+      "Name": "family_name",
+      "Required": true
+     }
+    ],
     "SmsVerificationMessage": "The verification code to your new account is {####}",
     "UserPoolName": "ehsshowchoir-users",
     "UsernameAttributes": [
@@ -545,8 +471,8 @@
     ],
     "VerificationMessageTemplate": {
      "DefaultEmailOption": "CONFIRM_WITH_CODE",
-     "EmailMessage": "Your verification code is {####}",
-     "EmailSubject": "Verify your email for Edgewood Show Choir",
+     "EmailMessage": "The verification code to your new account is {####}",
+     "EmailSubject": "Verify your new account",
      "SmsMessage": "The verification code to your new account is {####}"
     }
    },
@@ -556,35 +482,23 @@
     "aws:cdk:path": "EhsShowchoirStack/UserPool/Resource"
    }
   },
-  "UserPoolCognitoDomainD6C7F9FA": {
-   "Type": "AWS::Cognito::UserPoolDomain",
-   "Properties": {
-    "Domain": "ehsshowchoir-auth",
-    "UserPoolId": {
-     "Ref": "UserPool6BA7E5F2"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/UserPool/CognitoDomain/Resource"
-   }
-  },
   "UserPoolClient2F5918F7": {
    "Type": "AWS::Cognito::UserPoolClient",
    "Properties": {
     "AllowedOAuthFlows": [
+     "implicit",
      "code"
     ],
     "AllowedOAuthFlowsUserPoolClient": true,
     "AllowedOAuthScopes": [
+     "profile",
+     "phone",
      "email",
      "openid",
-     "profile"
+     "aws.cognito.signin.user.admin"
     ],
     "CallbackURLs": [
-     "https://edgewoodshowchoirpayments.org/auth/callback",
-     "https://edgewoodshowchoirpayments.org/",
-     "http://localhost:3000/auth/callback",
-     "http://localhost:3000/"
+     "https://example.com"
     ],
     "ExplicitAuthFlows": [
      "ALLOW_USER_PASSWORD_AUTH",
@@ -593,32 +507,27 @@
      "ALLOW_REFRESH_TOKEN_AUTH"
     ],
     "GenerateSecret": false,
-    "LogoutURLs": [
-     "https://edgewoodshowchoirpayments.org/auth/logout",
-     "https://edgewoodshowchoirpayments.org/",
-     "http://localhost:3000/auth/logout",
-     "http://localhost:3000/"
-    ],
-    "ReadAttributes": [
-     "email",
-     "email_verified",
-     "family_name",
-     "given_name"
-    ],
     "SupportedIdentityProviders": [
      "COGNITO"
     ],
     "UserPoolId": {
      "Ref": "UserPool6BA7E5F2"
-    },
-    "WriteAttributes": [
-     "email",
-     "family_name",
-     "given_name"
-    ]
+    }
    },
    "Metadata": {
     "aws:cdk:path": "EhsShowchoirStack/UserPoolClient/Resource"
+   }
+  },
+  "UserPoolDomain5479B217": {
+   "Type": "AWS::Cognito::UserPoolDomain",
+   "Properties": {
+    "Domain": "ehsshowchoir-auth",
+    "UserPoolId": {
+     "Ref": "UserPool6BA7E5F2"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "EhsShowchoirStack/UserPoolDomain/Resource"
    }
   },
   "LambdaRole3A44B857": {
@@ -656,8 +565,6 @@
        "Statement": [
         {
          "Action": [
-          "dynamodb:BatchGetItem",
-          "dynamodb:BatchWriteItem",
           "dynamodb:DeleteItem",
           "dynamodb:GetItem",
           "dynamodb:PutItem",
@@ -690,34 +597,6 @@
             "StudentsTableDAB56938",
             "Arn"
            ]
-          },
-          {
-           "Fn::Join": [
-            "",
-            [
-             {
-              "Fn::GetAtt": [
-               "PaymentHistoryTableB1149501",
-               "Arn"
-              ]
-             },
-             "/index/*"
-            ]
-           ]
-          },
-          {
-           "Fn::Join": [
-            "",
-            [
-             {
-              "Fn::GetAtt": [
-               "StudentsTableDAB56938",
-               "Arn"
-              ]
-             },
-             "/index/*"
-            ]
-           ]
           }
          ]
         }
@@ -733,7 +612,6 @@
          "Action": [
           "s3:DeleteObject",
           "s3:GetObject",
-          "s3:GetSignedUrl",
           "s3:PutObject"
          ],
          "Effect": "Allow",
@@ -762,7 +640,6 @@
        "Statement": [
         {
          "Action": [
-          "ses:SendBulkTemplatedEmail",
           "ses:SendEmail",
           "ses:SendRawEmail"
          ],
@@ -773,29 +650,6 @@
        "Version": "2012-10-17"
       },
       "PolicyName": "SESAccess"
-     },
-     {
-      "PolicyDocument": {
-       "Statement": [
-        {
-         "Action": [
-          "cognito-idp:AdminAddUserToGroup",
-          "cognito-idp:AdminGetUser",
-          "cognito-idp:AdminListGroupsForUser",
-          "cognito-idp:AdminRemoveUserFromGroup"
-         ],
-         "Effect": "Allow",
-         "Resource": {
-          "Fn::GetAtt": [
-           "UserPool6BA7E5F2",
-           "Arn"
-          ]
-         }
-        }
-       ],
-       "Version": "2012-10-17"
-      },
-      "PolicyName": "CognitoAccess"
      }
     ]
    },
@@ -803,41 +657,13 @@
     "aws:cdk:path": "EhsShowchoirStack/LambdaRole/Resource"
    }
   },
-  "ApiHandler5E7490E8": {
+  "StudentsLambdaB880940A": {
    "Type": "AWS::Lambda::Function",
    "Properties": {
     "Code": {
-     "S3Bucket": "cdk-hnb659fds-assets-636865837466-us-east-2",
-     "S3Key": "b4b3d5272187ddeb70283e6ecf10396ff94b19d337a55bf78af3757743b96d5d.zip"
-    },
-    "Description": "Main API handler for EHS Show Choir",
-    "Environment": {
-     "Variables": {
-      "STUDENTS_TABLE": {
-       "Ref": "StudentsTableDAB56938"
-      },
-      "PAYMENT_HISTORY_TABLE": {
-       "Ref": "PaymentHistoryTableB1149501"
-      },
-      "INVOICE_LOG_TABLE": {
-       "Ref": "InvoiceLogTable6D0E71B2"
-      },
-      "PARENT_STUDENT_TABLE": {
-       "Ref": "ParentStudentTable1F3E1FD1"
-      },
-      "INVOICES_BUCKET": {
-       "Ref": "InvoicesBucket57FCB164"
-      },
-      "USER_POOL_ID": {
-       "Ref": "UserPool6BA7E5F2"
-      },
-      "FROM_EMAIL": "treasurer@edgewoodshowchoirpayments.org",
-      "DOMAIN_NAME": "edgewoodshowchoirpayments.org",
-      "AWS_NODEJS_CONNECTION_REUSE_ENABLED": "1"
-     }
+     "ZipFile": "\n        exports.handler = async (event) => {\n          console.log('Students API called:', JSON.stringify(event, null, 2));\n          return {\n            statusCode: 200,\n            headers: {\n              'Access-Control-Allow-Origin': '*',\n              'Access-Control-Allow-Headers': 'Content-Type',\n              'Access-Control-Allow-Methods': 'OPTIONS,POST,GET,PUT,DELETE'\n            },\n            body: JSON.stringify({\n              message: 'Students API - Implementation needed',\n              event: event\n            }),\n          };\n        };\n      "
     },
     "Handler": "index.handler",
-    "MemorySize": 512,
     "Role": {
      "Fn::GetAtt": [
       "LambdaRole3A44B857",
@@ -851,159 +677,16 @@
     "LambdaRole3A44B857"
    ],
    "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/ApiHandler/Resource",
-    "aws:asset:path": "asset.b4b3d5272187ddeb70283e6ecf10396ff94b19d337a55bf78af3757743b96d5d",
-    "aws:asset:is-bundled": false,
-    "aws:asset:property": "Code"
+    "aws:cdk:path": "EhsShowchoirStack/StudentsLambda/Resource"
    }
   },
-  "ApiHandlerLogRetention907E318F": {
-   "Type": "Custom::LogRetention",
-   "Properties": {
-    "ServiceToken": {
-     "Fn::GetAtt": [
-      "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A",
-      "Arn"
-     ]
-    },
-    "LogGroupName": {
-     "Fn::Join": [
-      "",
-      [
-       "/aws/lambda/",
-       {
-        "Ref": "ApiHandler5E7490E8"
-       }
-      ]
-     ]
-    },
-    "RetentionInDays": 30
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/ApiHandler/LogRetention/Resource"
-   }
-  },
-  "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB": {
-   "Type": "AWS::IAM::Role",
-   "Properties": {
-    "AssumeRolePolicyDocument": {
-     "Statement": [
-      {
-       "Action": "sts:AssumeRole",
-       "Effect": "Allow",
-       "Principal": {
-        "Service": "lambda.amazonaws.com"
-       }
-      }
-     ],
-     "Version": "2012-10-17"
-    },
-    "ManagedPolicyArns": [
-     {
-      "Fn::Join": [
-       "",
-       [
-        "arn:",
-        {
-         "Ref": "AWS::Partition"
-        },
-        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-       ]
-      ]
-     }
-    ]
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/Resource"
-   }
-  },
-  "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB": {
-   "Type": "AWS::IAM::Policy",
-   "Properties": {
-    "PolicyDocument": {
-     "Statement": [
-      {
-       "Action": [
-        "logs:DeleteRetentionPolicy",
-        "logs:PutRetentionPolicy"
-       ],
-       "Effect": "Allow",
-       "Resource": "*"
-      }
-     ],
-     "Version": "2012-10-17"
-    },
-    "PolicyName": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB",
-    "Roles": [
-     {
-      "Ref": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB"
-     }
-    ]
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/DefaultPolicy/Resource"
-   }
-  },
-  "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A": {
+  "PaymentsLambda27AA6830": {
    "Type": "AWS::Lambda::Function",
    "Properties": {
+    "Code": {
+     "ZipFile": "\n        exports.handler = async (event) => {\n          console.log('Payments API called:', JSON.stringify(event, null, 2));\n          return {\n            statusCode: 200,\n            headers: {\n              'Access-Control-Allow-Origin': '*',\n              'Access-Control-Allow-Headers': 'Content-Type',\n              'Access-Control-Allow-Methods': 'OPTIONS,POST,GET,PUT,DELETE'\n            },\n            body: JSON.stringify({\n              message: 'Payments API - Implementation needed',\n              event: event\n            }),\n          };\n        };\n      "
+    },
     "Handler": "index.handler",
-    "Runtime": "nodejs22.x",
-    "Timeout": 900,
-    "Code": {
-     "S3Bucket": "cdk-hnb659fds-assets-636865837466-us-east-2",
-     "S3Key": "2819175352ad1ce0dae768e83fc328fb70fb5f10b4a8ff0ccbcb791f02b0716d.zip"
-    },
-    "Role": {
-     "Fn::GetAtt": [
-      "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB",
-      "Arn"
-     ]
-    }
-   },
-   "DependsOn": [
-    "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB",
-    "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB"
-   ],
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/Resource",
-    "aws:asset:path": "asset.2819175352ad1ce0dae768e83fc328fb70fb5f10b4a8ff0ccbcb791f02b0716d",
-    "aws:asset:is-bundled": false,
-    "aws:asset:property": "Code"
-   }
-  },
-  "BulkInvoiceHandler55959176": {
-   "Type": "AWS::Lambda::Function",
-   "Properties": {
-    "Code": {
-     "S3Bucket": "cdk-hnb659fds-assets-636865837466-us-east-2",
-     "S3Key": "b4b3d5272187ddeb70283e6ecf10396ff94b19d337a55bf78af3757743b96d5d.zip"
-    },
-    "Description": "Bulk invoice processing for EHS Show Choir",
-    "Environment": {
-     "Variables": {
-      "STUDENTS_TABLE": {
-       "Ref": "StudentsTableDAB56938"
-      },
-      "PAYMENT_HISTORY_TABLE": {
-       "Ref": "PaymentHistoryTableB1149501"
-      },
-      "INVOICE_LOG_TABLE": {
-       "Ref": "InvoiceLogTable6D0E71B2"
-      },
-      "PARENT_STUDENT_TABLE": {
-       "Ref": "ParentStudentTable1F3E1FD1"
-      },
-      "INVOICES_BUCKET": {
-       "Ref": "InvoicesBucket57FCB164"
-      },
-      "FROM_EMAIL": "treasurer@edgewoodshowchoirpayments.org",
-      "DOMAIN_NAME": "edgewoodshowchoirpayments.org",
-      "AWS_NODEJS_CONNECTION_REUSE_ENABLED": "1"
-     }
-    },
-    "Handler": "bulk-invoice-handler.bulkInvoiceHandler",
-    "MemorySize": 1024,
     "Role": {
      "Fn::GetAtt": [
       "LambdaRole3A44B857",
@@ -1011,88 +694,42 @@
      ]
     },
     "Runtime": "nodejs18.x",
-    "Timeout": 900
+    "Timeout": 30
    },
    "DependsOn": [
     "LambdaRole3A44B857"
    ],
    "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/BulkInvoiceHandler/Resource",
-    "aws:asset:path": "asset.b4b3d5272187ddeb70283e6ecf10396ff94b19d337a55bf78af3757743b96d5d",
-    "aws:asset:is-bundled": false,
-    "aws:asset:property": "Code"
-   }
-  },
-  "BulkInvoiceHandlerLogRetentionC79A65BE": {
-   "Type": "Custom::LogRetention",
-   "Properties": {
-    "ServiceToken": {
-     "Fn::GetAtt": [
-      "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A",
-      "Arn"
-     ]
-    },
-    "LogGroupName": {
-     "Fn::Join": [
-      "",
-      [
-       "/aws/lambda/",
-       {
-        "Ref": "BulkInvoiceHandler55959176"
-       }
-      ]
-     ]
-    },
-    "RetentionInDays": 30
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/BulkInvoiceHandler/LogRetention/Resource"
+    "aws:cdk:path": "EhsShowchoirStack/PaymentsLambda/Resource"
    }
   },
   "ApiF70053CD": {
    "Type": "AWS::ApiGateway::RestApi",
    "Properties": {
-    "Description": "EHS Show Choir Payment System API",
-    "Name": "ehsshowchoir-api"
+    "Description": "API for EHS Show Choir Payment System",
+    "Name": "EHS Show Choir API"
    },
    "Metadata": {
     "aws:cdk:path": "EhsShowchoirStack/Api/Resource"
    }
   },
-  "ApiDeploymentB17BE62D87509517dab5fe5f373a418bfc97561c": {
+  "ApiDeploymentB17BE62Df85279285260494fbf76304c6541a093": {
    "Type": "AWS::ApiGateway::Deployment",
    "Properties": {
-    "Description": "EHS Show Choir Payment System API",
+    "Description": "API for EHS Show Choir Payment System",
     "RestApiId": {
      "Ref": "ApiF70053CD"
     }
    },
    "DependsOn": [
-    "ApihealthGET8A9DC1E4",
-    "ApihealthOPTIONS119B6E46",
-    "Apihealth5CB7A415",
-    "ApiinvoicesbulksendOPTIONS64E26DC8",
-    "ApiinvoicesbulksendPOSTBB30D550",
-    "ApiinvoicesbulksendA1FBBE63",
-    "ApiinvoicesgenerateindividualOPTIONS0C82BEB7",
-    "ApiinvoicesgenerateindividualPOSTCB952379",
-    "Apiinvoicesgenerateindividual84E422D5",
-    "ApiinvoicesOPTIONS7831A8EF",
-    "ApiinvoicesAD9AA2E2",
     "ApiOPTIONS5886EA5D",
-    "ApipaymenthistoryGET1A372C7E",
-    "ApipaymenthistoryOPTIONS873861F5",
-    "ApipaymenthistoryPOST9A17E45A",
-    "Apipaymenthistory370FB0AD",
+    "ApipaymentsGET125774DF",
+    "ApipaymentsOPTIONS77BB5CA0",
+    "ApipaymentsPOSTDC87FFD1",
+    "Apipayments63A247CD",
     "ApistudentsstudentIdDELETE51D1B7FB",
     "ApistudentsstudentIdGET4602FEEF",
-    "ApistudentsstudentIdinvoicedataGETB39AF273",
-    "ApistudentsstudentIdinvoicedataOPTIONSF659A2B7",
-    "ApistudentsstudentIdinvoicedataE970C213",
     "ApistudentsstudentIdOPTIONS8E5D4962",
-    "ApistudentsstudentIdpaymenthistoryGET1E314884",
-    "ApistudentsstudentIdpaymenthistoryOPTIONS39E6FB6E",
-    "ApistudentsstudentIdpaymenthistoryE7DAFFCF",
     "ApistudentsstudentIdPUTA7105621",
     "ApistudentsstudentIdE5FA2788",
     "ApistudentsGETDB1069D5",
@@ -1109,16 +746,8 @@
    "Type": "AWS::ApiGateway::Stage",
    "Properties": {
     "DeploymentId": {
-     "Ref": "ApiDeploymentB17BE62D87509517dab5fe5f373a418bfc97561c"
+     "Ref": "ApiDeploymentB17BE62Df85279285260494fbf76304c6541a093"
     },
-    "MethodSettings": [
-     {
-      "DataTraceEnabled": true,
-      "HttpMethod": "*",
-      "LoggingLevel": "INFO",
-      "ResourcePath": "/*"
-     }
-    ],
     "RestApiId": {
      "Ref": "ApiF70053CD"
     },
@@ -1138,14 +767,9 @@
      "IntegrationResponses": [
       {
        "ResponseParameters": {
-        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'",
-        "method.response.header.Access-Control-Allow-Origin": "'https://edgewoodshowchoirpayments.org'",
-        "method.response.header.Vary": "'Origin'",
-        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'",
-        "method.response.header.Access-Control-Allow-Credentials": "'true'"
-       },
-       "ResponseTemplates": {
-        "application/json": "#set($origin = $input.params().header.get(\"Origin\"))\n#if($origin == \"\")\n  #set($origin = $input.params().header.get(\"origin\"))\n#end\n#if($origin == \"https://www.edgewoodshowchoirpayments.org\" || $origin == \"http://localhost:3000\" || $origin == \"http://localhost:5173\")\n  #set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)\n#end"
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
        },
        "StatusCode": "204"
       }
@@ -1160,9 +784,7 @@
       "ResponseParameters": {
        "method.response.header.Access-Control-Allow-Headers": true,
        "method.response.header.Access-Control-Allow-Origin": true,
-       "method.response.header.Vary": true,
-       "method.response.header.Access-Control-Allow-Methods": true,
-       "method.response.header.Access-Control-Allow-Credentials": true
+       "method.response.header.Access-Control-Allow-Methods": true
       },
       "StatusCode": "204"
      }
@@ -1179,172 +801,6 @@
    },
    "Metadata": {
     "aws:cdk:path": "EhsShowchoirStack/Api/Default/OPTIONS/Resource"
-   }
-  },
-  "Apihealth5CB7A415": {
-   "Type": "AWS::ApiGateway::Resource",
-   "Properties": {
-    "ParentId": {
-     "Fn::GetAtt": [
-      "ApiF70053CD",
-      "RootResourceId"
-     ]
-    },
-    "PathPart": "health",
-    "RestApiId": {
-     "Ref": "ApiF70053CD"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/health/Resource"
-   }
-  },
-  "ApihealthOPTIONS119B6E46": {
-   "Type": "AWS::ApiGateway::Method",
-   "Properties": {
-    "ApiKeyRequired": false,
-    "AuthorizationType": "NONE",
-    "HttpMethod": "OPTIONS",
-    "Integration": {
-     "IntegrationResponses": [
-      {
-       "ResponseParameters": {
-        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'",
-        "method.response.header.Access-Control-Allow-Origin": "'https://edgewoodshowchoirpayments.org'",
-        "method.response.header.Vary": "'Origin'",
-        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'",
-        "method.response.header.Access-Control-Allow-Credentials": "'true'"
-       },
-       "ResponseTemplates": {
-        "application/json": "#set($origin = $input.params().header.get(\"Origin\"))\n#if($origin == \"\")\n  #set($origin = $input.params().header.get(\"origin\"))\n#end\n#if($origin == \"https://www.edgewoodshowchoirpayments.org\" || $origin == \"http://localhost:3000\" || $origin == \"http://localhost:5173\")\n  #set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)\n#end"
-       },
-       "StatusCode": "204"
-      }
-     ],
-     "RequestTemplates": {
-      "application/json": "{ statusCode: 200 }"
-     },
-     "Type": "MOCK"
-    },
-    "MethodResponses": [
-     {
-      "ResponseParameters": {
-       "method.response.header.Access-Control-Allow-Headers": true,
-       "method.response.header.Access-Control-Allow-Origin": true,
-       "method.response.header.Vary": true,
-       "method.response.header.Access-Control-Allow-Methods": true,
-       "method.response.header.Access-Control-Allow-Credentials": true
-      },
-      "StatusCode": "204"
-     }
-    ],
-    "ResourceId": {
-     "Ref": "Apihealth5CB7A415"
-    },
-    "RestApiId": {
-     "Ref": "ApiF70053CD"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/health/OPTIONS/Resource"
-   }
-  },
-  "ApihealthGETApiPermissionEhsShowchoirStackApi62088C04GEThealthE24F6EFC": {
-   "Type": "AWS::Lambda::Permission",
-   "Properties": {
-    "Action": "lambda:InvokeFunction",
-    "FunctionName": {
-     "Fn::GetAtt": [
-      "ApiHandler5E7490E8",
-      "Arn"
-     ]
-    },
-    "Principal": "apigateway.amazonaws.com",
-    "SourceArn": {
-     "Fn::Join": [
-      "",
-      [
-       "arn:aws:execute-api:us-east-2:636865837466:",
-       {
-        "Ref": "ApiF70053CD"
-       },
-       "/",
-       {
-        "Ref": "ApiDeploymentStageprod3EB9684E"
-       },
-       "/GET/health"
-      ]
-     ]
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/health/GET/ApiPermission.EhsShowchoirStackApi62088C04.GET..health"
-   }
-  },
-  "ApihealthGETApiPermissionTestEhsShowchoirStackApi62088C04GEThealthE68716BE": {
-   "Type": "AWS::Lambda::Permission",
-   "Properties": {
-    "Action": "lambda:InvokeFunction",
-    "FunctionName": {
-     "Fn::GetAtt": [
-      "ApiHandler5E7490E8",
-      "Arn"
-     ]
-    },
-    "Principal": "apigateway.amazonaws.com",
-    "SourceArn": {
-     "Fn::Join": [
-      "",
-      [
-       "arn:aws:execute-api:us-east-2:636865837466:",
-       {
-        "Ref": "ApiF70053CD"
-       },
-       "/test-invoke-stage/GET/health"
-      ]
-     ]
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/health/GET/ApiPermission.Test.EhsShowchoirStackApi62088C04.GET..health"
-   }
-  },
-  "ApihealthGET8A9DC1E4": {
-   "Type": "AWS::ApiGateway::Method",
-   "Properties": {
-    "AuthorizationType": "NONE",
-    "HttpMethod": "GET",
-    "Integration": {
-     "IntegrationHttpMethod": "POST",
-     "RequestTemplates": {
-      "application/json": "{ \"statusCode\": \"200\" }"
-     },
-     "Type": "AWS_PROXY",
-     "Uri": {
-      "Fn::Join": [
-       "",
-       [
-        "arn:aws:apigateway:us-east-2:lambda:path/2015-03-31/functions/",
-        {
-         "Fn::GetAtt": [
-          "ApiHandler5E7490E8",
-          "Arn"
-         ]
-        },
-        "/invocations"
-       ]
-      ]
-     }
-    },
-    "ResourceId": {
-     "Ref": "Apihealth5CB7A415"
-    },
-    "RestApiId": {
-     "Ref": "ApiF70053CD"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/health/GET/Resource"
    }
   },
   "ApistudentsD99697EF": {
@@ -1375,14 +831,9 @@
      "IntegrationResponses": [
       {
        "ResponseParameters": {
-        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'",
-        "method.response.header.Access-Control-Allow-Origin": "'https://edgewoodshowchoirpayments.org'",
-        "method.response.header.Vary": "'Origin'",
-        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'",
-        "method.response.header.Access-Control-Allow-Credentials": "'true'"
-       },
-       "ResponseTemplates": {
-        "application/json": "#set($origin = $input.params().header.get(\"Origin\"))\n#if($origin == \"\")\n  #set($origin = $input.params().header.get(\"origin\"))\n#end\n#if($origin == \"https://www.edgewoodshowchoirpayments.org\" || $origin == \"http://localhost:3000\" || $origin == \"http://localhost:5173\")\n  #set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)\n#end"
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
        },
        "StatusCode": "204"
       }
@@ -1397,9 +848,7 @@
       "ResponseParameters": {
        "method.response.header.Access-Control-Allow-Headers": true,
        "method.response.header.Access-Control-Allow-Origin": true,
-       "method.response.header.Vary": true,
-       "method.response.header.Access-Control-Allow-Methods": true,
-       "method.response.header.Access-Control-Allow-Credentials": true
+       "method.response.header.Access-Control-Allow-Methods": true
       },
       "StatusCode": "204"
      }
@@ -1421,7 +870,7 @@
     "Action": "lambda:InvokeFunction",
     "FunctionName": {
      "Fn::GetAtt": [
-      "ApiHandler5E7490E8",
+      "StudentsLambdaB880940A",
       "Arn"
      ]
     },
@@ -1453,7 +902,7 @@
     "Action": "lambda:InvokeFunction",
     "FunctionName": {
      "Fn::GetAtt": [
-      "ApiHandler5E7490E8",
+      "StudentsLambdaB880940A",
       "Arn"
      ]
     },
@@ -1478,16 +927,10 @@
   "ApistudentsGETDB1069D5": {
    "Type": "AWS::ApiGateway::Method",
    "Properties": {
-    "AuthorizationType": "COGNITO_USER_POOLS",
-    "AuthorizerId": {
-     "Ref": "AuthorizerBD825682"
-    },
+    "AuthorizationType": "NONE",
     "HttpMethod": "GET",
     "Integration": {
      "IntegrationHttpMethod": "POST",
-     "RequestTemplates": {
-      "application/json": "{ \"statusCode\": \"200\" }"
-     },
      "Type": "AWS_PROXY",
      "Uri": {
       "Fn::Join": [
@@ -1496,7 +939,7 @@
         "arn:aws:apigateway:us-east-2:lambda:path/2015-03-31/functions/",
         {
          "Fn::GetAtt": [
-          "ApiHandler5E7490E8",
+          "StudentsLambdaB880940A",
           "Arn"
          ]
         },
@@ -1522,7 +965,7 @@
     "Action": "lambda:InvokeFunction",
     "FunctionName": {
      "Fn::GetAtt": [
-      "ApiHandler5E7490E8",
+      "StudentsLambdaB880940A",
       "Arn"
      ]
     },
@@ -1554,7 +997,7 @@
     "Action": "lambda:InvokeFunction",
     "FunctionName": {
      "Fn::GetAtt": [
-      "ApiHandler5E7490E8",
+      "StudentsLambdaB880940A",
       "Arn"
      ]
     },
@@ -1579,16 +1022,10 @@
   "ApistudentsPOST89E958F6": {
    "Type": "AWS::ApiGateway::Method",
    "Properties": {
-    "AuthorizationType": "COGNITO_USER_POOLS",
-    "AuthorizerId": {
-     "Ref": "AuthorizerBD825682"
-    },
+    "AuthorizationType": "NONE",
     "HttpMethod": "POST",
     "Integration": {
      "IntegrationHttpMethod": "POST",
-     "RequestTemplates": {
-      "application/json": "{ \"statusCode\": \"200\" }"
-     },
      "Type": "AWS_PROXY",
      "Uri": {
       "Fn::Join": [
@@ -1597,7 +1034,7 @@
         "arn:aws:apigateway:us-east-2:lambda:path/2015-03-31/functions/",
         {
          "Fn::GetAtt": [
-          "ApiHandler5E7490E8",
+          "StudentsLambdaB880940A",
           "Arn"
          ]
         },
@@ -1642,14 +1079,9 @@
      "IntegrationResponses": [
       {
        "ResponseParameters": {
-        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'",
-        "method.response.header.Access-Control-Allow-Origin": "'https://edgewoodshowchoirpayments.org'",
-        "method.response.header.Vary": "'Origin'",
-        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'",
-        "method.response.header.Access-Control-Allow-Credentials": "'true'"
-       },
-       "ResponseTemplates": {
-        "application/json": "#set($origin = $input.params().header.get(\"Origin\"))\n#if($origin == \"\")\n  #set($origin = $input.params().header.get(\"origin\"))\n#end\n#if($origin == \"https://www.edgewoodshowchoirpayments.org\" || $origin == \"http://localhost:3000\" || $origin == \"http://localhost:5173\")\n  #set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)\n#end"
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
        },
        "StatusCode": "204"
       }
@@ -1664,9 +1096,7 @@
       "ResponseParameters": {
        "method.response.header.Access-Control-Allow-Headers": true,
        "method.response.header.Access-Control-Allow-Origin": true,
-       "method.response.header.Vary": true,
-       "method.response.header.Access-Control-Allow-Methods": true,
-       "method.response.header.Access-Control-Allow-Credentials": true
+       "method.response.header.Access-Control-Allow-Methods": true
       },
       "StatusCode": "204"
      }
@@ -1688,7 +1118,7 @@
     "Action": "lambda:InvokeFunction",
     "FunctionName": {
      "Fn::GetAtt": [
-      "ApiHandler5E7490E8",
+      "StudentsLambdaB880940A",
       "Arn"
      ]
     },
@@ -1720,7 +1150,7 @@
     "Action": "lambda:InvokeFunction",
     "FunctionName": {
      "Fn::GetAtt": [
-      "ApiHandler5E7490E8",
+      "StudentsLambdaB880940A",
       "Arn"
      ]
     },
@@ -1745,16 +1175,10 @@
   "ApistudentsstudentIdGET4602FEEF": {
    "Type": "AWS::ApiGateway::Method",
    "Properties": {
-    "AuthorizationType": "COGNITO_USER_POOLS",
-    "AuthorizerId": {
-     "Ref": "AuthorizerBD825682"
-    },
+    "AuthorizationType": "NONE",
     "HttpMethod": "GET",
     "Integration": {
      "IntegrationHttpMethod": "POST",
-     "RequestTemplates": {
-      "application/json": "{ \"statusCode\": \"200\" }"
-     },
      "Type": "AWS_PROXY",
      "Uri": {
       "Fn::Join": [
@@ -1763,7 +1187,7 @@
         "arn:aws:apigateway:us-east-2:lambda:path/2015-03-31/functions/",
         {
          "Fn::GetAtt": [
-          "ApiHandler5E7490E8",
+          "StudentsLambdaB880940A",
           "Arn"
          ]
         },
@@ -1789,7 +1213,7 @@
     "Action": "lambda:InvokeFunction",
     "FunctionName": {
      "Fn::GetAtt": [
-      "ApiHandler5E7490E8",
+      "StudentsLambdaB880940A",
       "Arn"
      ]
     },
@@ -1821,7 +1245,7 @@
     "Action": "lambda:InvokeFunction",
     "FunctionName": {
      "Fn::GetAtt": [
-      "ApiHandler5E7490E8",
+      "StudentsLambdaB880940A",
       "Arn"
      ]
     },
@@ -1846,16 +1270,10 @@
   "ApistudentsstudentIdPUTA7105621": {
    "Type": "AWS::ApiGateway::Method",
    "Properties": {
-    "AuthorizationType": "COGNITO_USER_POOLS",
-    "AuthorizerId": {
-     "Ref": "AuthorizerBD825682"
-    },
+    "AuthorizationType": "NONE",
     "HttpMethod": "PUT",
     "Integration": {
      "IntegrationHttpMethod": "POST",
-     "RequestTemplates": {
-      "application/json": "{ \"statusCode\": \"200\" }"
-     },
      "Type": "AWS_PROXY",
      "Uri": {
       "Fn::Join": [
@@ -1864,7 +1282,7 @@
         "arn:aws:apigateway:us-east-2:lambda:path/2015-03-31/functions/",
         {
          "Fn::GetAtt": [
-          "ApiHandler5E7490E8",
+          "StudentsLambdaB880940A",
           "Arn"
          ]
         },
@@ -1890,7 +1308,7 @@
     "Action": "lambda:InvokeFunction",
     "FunctionName": {
      "Fn::GetAtt": [
-      "ApiHandler5E7490E8",
+      "StudentsLambdaB880940A",
       "Arn"
      ]
     },
@@ -1922,7 +1340,7 @@
     "Action": "lambda:InvokeFunction",
     "FunctionName": {
      "Fn::GetAtt": [
-      "ApiHandler5E7490E8",
+      "StudentsLambdaB880940A",
       "Arn"
      ]
     },
@@ -1947,16 +1365,10 @@
   "ApistudentsstudentIdDELETE51D1B7FB": {
    "Type": "AWS::ApiGateway::Method",
    "Properties": {
-    "AuthorizationType": "COGNITO_USER_POOLS",
-    "AuthorizerId": {
-     "Ref": "AuthorizerBD825682"
-    },
+    "AuthorizationType": "NONE",
     "HttpMethod": "DELETE",
     "Integration": {
      "IntegrationHttpMethod": "POST",
-     "RequestTemplates": {
-      "application/json": "{ \"statusCode\": \"200\" }"
-     },
      "Type": "AWS_PROXY",
      "Uri": {
       "Fn::Join": [
@@ -1965,7 +1377,7 @@
         "arn:aws:apigateway:us-east-2:lambda:path/2015-03-31/functions/",
         {
          "Fn::GetAtt": [
-          "ApiHandler5E7490E8",
+          "StudentsLambdaB880940A",
           "Arn"
          ]
         },
@@ -1985,339 +1397,7 @@
     "aws:cdk:path": "EhsShowchoirStack/Api/Default/students/{studentId}/DELETE/Resource"
    }
   },
-  "ApistudentsstudentIdinvoicedataE970C213": {
-   "Type": "AWS::ApiGateway::Resource",
-   "Properties": {
-    "ParentId": {
-     "Ref": "ApistudentsstudentIdE5FA2788"
-    },
-    "PathPart": "invoice-data",
-    "RestApiId": {
-     "Ref": "ApiF70053CD"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/students/{studentId}/invoice-data/Resource"
-   }
-  },
-  "ApistudentsstudentIdinvoicedataOPTIONSF659A2B7": {
-   "Type": "AWS::ApiGateway::Method",
-   "Properties": {
-    "ApiKeyRequired": false,
-    "AuthorizationType": "NONE",
-    "HttpMethod": "OPTIONS",
-    "Integration": {
-     "IntegrationResponses": [
-      {
-       "ResponseParameters": {
-        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'",
-        "method.response.header.Access-Control-Allow-Origin": "'https://edgewoodshowchoirpayments.org'",
-        "method.response.header.Vary": "'Origin'",
-        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'",
-        "method.response.header.Access-Control-Allow-Credentials": "'true'"
-       },
-       "ResponseTemplates": {
-        "application/json": "#set($origin = $input.params().header.get(\"Origin\"))\n#if($origin == \"\")\n  #set($origin = $input.params().header.get(\"origin\"))\n#end\n#if($origin == \"https://www.edgewoodshowchoirpayments.org\" || $origin == \"http://localhost:3000\" || $origin == \"http://localhost:5173\")\n  #set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)\n#end"
-       },
-       "StatusCode": "204"
-      }
-     ],
-     "RequestTemplates": {
-      "application/json": "{ statusCode: 200 }"
-     },
-     "Type": "MOCK"
-    },
-    "MethodResponses": [
-     {
-      "ResponseParameters": {
-       "method.response.header.Access-Control-Allow-Headers": true,
-       "method.response.header.Access-Control-Allow-Origin": true,
-       "method.response.header.Vary": true,
-       "method.response.header.Access-Control-Allow-Methods": true,
-       "method.response.header.Access-Control-Allow-Credentials": true
-      },
-      "StatusCode": "204"
-     }
-    ],
-    "ResourceId": {
-     "Ref": "ApistudentsstudentIdinvoicedataE970C213"
-    },
-    "RestApiId": {
-     "Ref": "ApiF70053CD"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/students/{studentId}/invoice-data/OPTIONS/Resource"
-   }
-  },
-  "ApistudentsstudentIdinvoicedataGETApiPermissionEhsShowchoirStackApi62088C04GETstudentsstudentIdinvoicedataB0313FD0": {
-   "Type": "AWS::Lambda::Permission",
-   "Properties": {
-    "Action": "lambda:InvokeFunction",
-    "FunctionName": {
-     "Fn::GetAtt": [
-      "ApiHandler5E7490E8",
-      "Arn"
-     ]
-    },
-    "Principal": "apigateway.amazonaws.com",
-    "SourceArn": {
-     "Fn::Join": [
-      "",
-      [
-       "arn:aws:execute-api:us-east-2:636865837466:",
-       {
-        "Ref": "ApiF70053CD"
-       },
-       "/",
-       {
-        "Ref": "ApiDeploymentStageprod3EB9684E"
-       },
-       "/GET/students/*/invoice-data"
-      ]
-     ]
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/students/{studentId}/invoice-data/GET/ApiPermission.EhsShowchoirStackApi62088C04.GET..students.{studentId}.invoice-data"
-   }
-  },
-  "ApistudentsstudentIdinvoicedataGETApiPermissionTestEhsShowchoirStackApi62088C04GETstudentsstudentIdinvoicedata6959D134": {
-   "Type": "AWS::Lambda::Permission",
-   "Properties": {
-    "Action": "lambda:InvokeFunction",
-    "FunctionName": {
-     "Fn::GetAtt": [
-      "ApiHandler5E7490E8",
-      "Arn"
-     ]
-    },
-    "Principal": "apigateway.amazonaws.com",
-    "SourceArn": {
-     "Fn::Join": [
-      "",
-      [
-       "arn:aws:execute-api:us-east-2:636865837466:",
-       {
-        "Ref": "ApiF70053CD"
-       },
-       "/test-invoke-stage/GET/students/*/invoice-data"
-      ]
-     ]
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/students/{studentId}/invoice-data/GET/ApiPermission.Test.EhsShowchoirStackApi62088C04.GET..students.{studentId}.invoice-data"
-   }
-  },
-  "ApistudentsstudentIdinvoicedataGETB39AF273": {
-   "Type": "AWS::ApiGateway::Method",
-   "Properties": {
-    "AuthorizationType": "COGNITO_USER_POOLS",
-    "AuthorizerId": {
-     "Ref": "AuthorizerBD825682"
-    },
-    "HttpMethod": "GET",
-    "Integration": {
-     "IntegrationHttpMethod": "POST",
-     "RequestTemplates": {
-      "application/json": "{ \"statusCode\": \"200\" }"
-     },
-     "Type": "AWS_PROXY",
-     "Uri": {
-      "Fn::Join": [
-       "",
-       [
-        "arn:aws:apigateway:us-east-2:lambda:path/2015-03-31/functions/",
-        {
-         "Fn::GetAtt": [
-          "ApiHandler5E7490E8",
-          "Arn"
-         ]
-        },
-        "/invocations"
-       ]
-      ]
-     }
-    },
-    "ResourceId": {
-     "Ref": "ApistudentsstudentIdinvoicedataE970C213"
-    },
-    "RestApiId": {
-     "Ref": "ApiF70053CD"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/students/{studentId}/invoice-data/GET/Resource"
-   }
-  },
-  "ApistudentsstudentIdpaymenthistoryE7DAFFCF": {
-   "Type": "AWS::ApiGateway::Resource",
-   "Properties": {
-    "ParentId": {
-     "Ref": "ApistudentsstudentIdE5FA2788"
-    },
-    "PathPart": "payment-history",
-    "RestApiId": {
-     "Ref": "ApiF70053CD"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/students/{studentId}/payment-history/Resource"
-   }
-  },
-  "ApistudentsstudentIdpaymenthistoryOPTIONS39E6FB6E": {
-   "Type": "AWS::ApiGateway::Method",
-   "Properties": {
-    "ApiKeyRequired": false,
-    "AuthorizationType": "NONE",
-    "HttpMethod": "OPTIONS",
-    "Integration": {
-     "IntegrationResponses": [
-      {
-       "ResponseParameters": {
-        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'",
-        "method.response.header.Access-Control-Allow-Origin": "'https://edgewoodshowchoirpayments.org'",
-        "method.response.header.Vary": "'Origin'",
-        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'",
-        "method.response.header.Access-Control-Allow-Credentials": "'true'"
-       },
-       "ResponseTemplates": {
-        "application/json": "#set($origin = $input.params().header.get(\"Origin\"))\n#if($origin == \"\")\n  #set($origin = $input.params().header.get(\"origin\"))\n#end\n#if($origin == \"https://www.edgewoodshowchoirpayments.org\" || $origin == \"http://localhost:3000\" || $origin == \"http://localhost:5173\")\n  #set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)\n#end"
-       },
-       "StatusCode": "204"
-      }
-     ],
-     "RequestTemplates": {
-      "application/json": "{ statusCode: 200 }"
-     },
-     "Type": "MOCK"
-    },
-    "MethodResponses": [
-     {
-      "ResponseParameters": {
-       "method.response.header.Access-Control-Allow-Headers": true,
-       "method.response.header.Access-Control-Allow-Origin": true,
-       "method.response.header.Vary": true,
-       "method.response.header.Access-Control-Allow-Methods": true,
-       "method.response.header.Access-Control-Allow-Credentials": true
-      },
-      "StatusCode": "204"
-     }
-    ],
-    "ResourceId": {
-     "Ref": "ApistudentsstudentIdpaymenthistoryE7DAFFCF"
-    },
-    "RestApiId": {
-     "Ref": "ApiF70053CD"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/students/{studentId}/payment-history/OPTIONS/Resource"
-   }
-  },
-  "ApistudentsstudentIdpaymenthistoryGETApiPermissionEhsShowchoirStackApi62088C04GETstudentsstudentIdpaymenthistory1A3C0796": {
-   "Type": "AWS::Lambda::Permission",
-   "Properties": {
-    "Action": "lambda:InvokeFunction",
-    "FunctionName": {
-     "Fn::GetAtt": [
-      "ApiHandler5E7490E8",
-      "Arn"
-     ]
-    },
-    "Principal": "apigateway.amazonaws.com",
-    "SourceArn": {
-     "Fn::Join": [
-      "",
-      [
-       "arn:aws:execute-api:us-east-2:636865837466:",
-       {
-        "Ref": "ApiF70053CD"
-       },
-       "/",
-       {
-        "Ref": "ApiDeploymentStageprod3EB9684E"
-       },
-       "/GET/students/*/payment-history"
-      ]
-     ]
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/students/{studentId}/payment-history/GET/ApiPermission.EhsShowchoirStackApi62088C04.GET..students.{studentId}.payment-history"
-   }
-  },
-  "ApistudentsstudentIdpaymenthistoryGETApiPermissionTestEhsShowchoirStackApi62088C04GETstudentsstudentIdpaymenthistoryD5EDA9F4": {
-   "Type": "AWS::Lambda::Permission",
-   "Properties": {
-    "Action": "lambda:InvokeFunction",
-    "FunctionName": {
-     "Fn::GetAtt": [
-      "ApiHandler5E7490E8",
-      "Arn"
-     ]
-    },
-    "Principal": "apigateway.amazonaws.com",
-    "SourceArn": {
-     "Fn::Join": [
-      "",
-      [
-       "arn:aws:execute-api:us-east-2:636865837466:",
-       {
-        "Ref": "ApiF70053CD"
-       },
-       "/test-invoke-stage/GET/students/*/payment-history"
-      ]
-     ]
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/students/{studentId}/payment-history/GET/ApiPermission.Test.EhsShowchoirStackApi62088C04.GET..students.{studentId}.payment-history"
-   }
-  },
-  "ApistudentsstudentIdpaymenthistoryGET1E314884": {
-   "Type": "AWS::ApiGateway::Method",
-   "Properties": {
-    "AuthorizationType": "COGNITO_USER_POOLS",
-    "AuthorizerId": {
-     "Ref": "AuthorizerBD825682"
-    },
-    "HttpMethod": "GET",
-    "Integration": {
-     "IntegrationHttpMethod": "POST",
-     "RequestTemplates": {
-      "application/json": "{ \"statusCode\": \"200\" }"
-     },
-     "Type": "AWS_PROXY",
-     "Uri": {
-      "Fn::Join": [
-       "",
-       [
-        "arn:aws:apigateway:us-east-2:lambda:path/2015-03-31/functions/",
-        {
-         "Fn::GetAtt": [
-          "ApiHandler5E7490E8",
-          "Arn"
-         ]
-        },
-        "/invocations"
-       ]
-      ]
-     }
-    },
-    "ResourceId": {
-     "Ref": "ApistudentsstudentIdpaymenthistoryE7DAFFCF"
-    },
-    "RestApiId": {
-     "Ref": "ApiF70053CD"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/students/{studentId}/payment-history/GET/Resource"
-   }
-  },
-  "ApiinvoicesAD9AA2E2": {
+  "Apipayments63A247CD": {
    "Type": "AWS::ApiGateway::Resource",
    "Properties": {
     "ParentId": {
@@ -2326,16 +1406,16 @@
       "RootResourceId"
      ]
     },
-    "PathPart": "invoices",
+    "PathPart": "payments",
     "RestApiId": {
      "Ref": "ApiF70053CD"
     }
    },
    "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/invoices/Resource"
+    "aws:cdk:path": "EhsShowchoirStack/Api/Default/payments/Resource"
    }
   },
-  "ApiinvoicesOPTIONS7831A8EF": {
+  "ApipaymentsOPTIONS77BB5CA0": {
    "Type": "AWS::ApiGateway::Method",
    "Properties": {
     "ApiKeyRequired": false,
@@ -2345,14 +1425,9 @@
      "IntegrationResponses": [
       {
        "ResponseParameters": {
-        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'",
-        "method.response.header.Access-Control-Allow-Origin": "'https://edgewoodshowchoirpayments.org'",
-        "method.response.header.Vary": "'Origin'",
-        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'",
-        "method.response.header.Access-Control-Allow-Credentials": "'true'"
-       },
-       "ResponseTemplates": {
-        "application/json": "#set($origin = $input.params().header.get(\"Origin\"))\n#if($origin == \"\")\n  #set($origin = $input.params().header.get(\"origin\"))\n#end\n#if($origin == \"https://www.edgewoodshowchoirpayments.org\" || $origin == \"http://localhost:3000\" || $origin == \"http://localhost:5173\")\n  #set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)\n#end"
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
        },
        "StatusCode": "204"
       }
@@ -2367,96 +1442,29 @@
       "ResponseParameters": {
        "method.response.header.Access-Control-Allow-Headers": true,
        "method.response.header.Access-Control-Allow-Origin": true,
-       "method.response.header.Vary": true,
-       "method.response.header.Access-Control-Allow-Methods": true,
-       "method.response.header.Access-Control-Allow-Credentials": true
+       "method.response.header.Access-Control-Allow-Methods": true
       },
       "StatusCode": "204"
      }
     ],
     "ResourceId": {
-     "Ref": "ApiinvoicesAD9AA2E2"
+     "Ref": "Apipayments63A247CD"
     },
     "RestApiId": {
      "Ref": "ApiF70053CD"
     }
    },
    "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/invoices/OPTIONS/Resource"
+    "aws:cdk:path": "EhsShowchoirStack/Api/Default/payments/OPTIONS/Resource"
    }
   },
-  "ApiinvoicesbulksendA1FBBE63": {
-   "Type": "AWS::ApiGateway::Resource",
-   "Properties": {
-    "ParentId": {
-     "Ref": "ApiinvoicesAD9AA2E2"
-    },
-    "PathPart": "bulk-send",
-    "RestApiId": {
-     "Ref": "ApiF70053CD"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/invoices/bulk-send/Resource"
-   }
-  },
-  "ApiinvoicesbulksendOPTIONS64E26DC8": {
-   "Type": "AWS::ApiGateway::Method",
-   "Properties": {
-    "ApiKeyRequired": false,
-    "AuthorizationType": "NONE",
-    "HttpMethod": "OPTIONS",
-    "Integration": {
-     "IntegrationResponses": [
-      {
-       "ResponseParameters": {
-        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'",
-        "method.response.header.Access-Control-Allow-Origin": "'https://edgewoodshowchoirpayments.org'",
-        "method.response.header.Vary": "'Origin'",
-        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'",
-        "method.response.header.Access-Control-Allow-Credentials": "'true'"
-       },
-       "ResponseTemplates": {
-        "application/json": "#set($origin = $input.params().header.get(\"Origin\"))\n#if($origin == \"\")\n  #set($origin = $input.params().header.get(\"origin\"))\n#end\n#if($origin == \"https://www.edgewoodshowchoirpayments.org\" || $origin == \"http://localhost:3000\" || $origin == \"http://localhost:5173\")\n  #set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)\n#end"
-       },
-       "StatusCode": "204"
-      }
-     ],
-     "RequestTemplates": {
-      "application/json": "{ statusCode: 200 }"
-     },
-     "Type": "MOCK"
-    },
-    "MethodResponses": [
-     {
-      "ResponseParameters": {
-       "method.response.header.Access-Control-Allow-Headers": true,
-       "method.response.header.Access-Control-Allow-Origin": true,
-       "method.response.header.Vary": true,
-       "method.response.header.Access-Control-Allow-Methods": true,
-       "method.response.header.Access-Control-Allow-Credentials": true
-      },
-      "StatusCode": "204"
-     }
-    ],
-    "ResourceId": {
-     "Ref": "ApiinvoicesbulksendA1FBBE63"
-    },
-    "RestApiId": {
-     "Ref": "ApiF70053CD"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/invoices/bulk-send/OPTIONS/Resource"
-   }
-  },
-  "ApiinvoicesbulksendPOSTApiPermissionEhsShowchoirStackApi62088C04POSTinvoicesbulksend29F33F55": {
+  "ApipaymentsGETApiPermissionEhsShowchoirStackApi62088C04GETpayments77D02CD1": {
    "Type": "AWS::Lambda::Permission",
    "Properties": {
     "Action": "lambda:InvokeFunction",
     "FunctionName": {
      "Fn::GetAtt": [
-      "BulkInvoiceHandler55959176",
+      "PaymentsLambda27AA6830",
       "Arn"
      ]
     },
@@ -2473,22 +1481,22 @@
        {
         "Ref": "ApiDeploymentStageprod3EB9684E"
        },
-       "/POST/invoices/bulk-send"
+       "/GET/payments"
       ]
      ]
     }
    },
    "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/invoices/bulk-send/POST/ApiPermission.EhsShowchoirStackApi62088C04.POST..invoices.bulk-send"
+    "aws:cdk:path": "EhsShowchoirStack/Api/Default/payments/GET/ApiPermission.EhsShowchoirStackApi62088C04.GET..payments"
    }
   },
-  "ApiinvoicesbulksendPOSTApiPermissionTestEhsShowchoirStackApi62088C04POSTinvoicesbulksend03173BC7": {
+  "ApipaymentsGETApiPermissionTestEhsShowchoirStackApi62088C04GETpaymentsAF1BBCD3": {
    "Type": "AWS::Lambda::Permission",
    "Properties": {
     "Action": "lambda:InvokeFunction",
     "FunctionName": {
      "Fn::GetAtt": [
-      "BulkInvoiceHandler55959176",
+      "PaymentsLambda27AA6830",
       "Arn"
      ]
     },
@@ -2501,363 +1509,22 @@
        {
         "Ref": "ApiF70053CD"
        },
-       "/test-invoke-stage/POST/invoices/bulk-send"
+       "/test-invoke-stage/GET/payments"
       ]
      ]
     }
    },
    "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/invoices/bulk-send/POST/ApiPermission.Test.EhsShowchoirStackApi62088C04.POST..invoices.bulk-send"
+    "aws:cdk:path": "EhsShowchoirStack/Api/Default/payments/GET/ApiPermission.Test.EhsShowchoirStackApi62088C04.GET..payments"
    }
   },
-  "ApiinvoicesbulksendPOSTBB30D550": {
+  "ApipaymentsGET125774DF": {
    "Type": "AWS::ApiGateway::Method",
    "Properties": {
-    "AuthorizationType": "COGNITO_USER_POOLS",
-    "AuthorizerId": {
-     "Ref": "AuthorizerBD825682"
-    },
-    "HttpMethod": "POST",
-    "Integration": {
-     "IntegrationHttpMethod": "POST",
-     "RequestTemplates": {
-      "application/json": "{ \"statusCode\": \"200\" }"
-     },
-     "Type": "AWS_PROXY",
-     "Uri": {
-      "Fn::Join": [
-       "",
-       [
-        "arn:aws:apigateway:us-east-2:lambda:path/2015-03-31/functions/",
-        {
-         "Fn::GetAtt": [
-          "BulkInvoiceHandler55959176",
-          "Arn"
-         ]
-        },
-        "/invocations"
-       ]
-      ]
-     }
-    },
-    "ResourceId": {
-     "Ref": "ApiinvoicesbulksendA1FBBE63"
-    },
-    "RestApiId": {
-     "Ref": "ApiF70053CD"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/invoices/bulk-send/POST/Resource"
-   }
-  },
-  "Apiinvoicesgenerateindividual84E422D5": {
-   "Type": "AWS::ApiGateway::Resource",
-   "Properties": {
-    "ParentId": {
-     "Ref": "ApiinvoicesAD9AA2E2"
-    },
-    "PathPart": "generate-individual",
-    "RestApiId": {
-     "Ref": "ApiF70053CD"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/invoices/generate-individual/Resource"
-   }
-  },
-  "ApiinvoicesgenerateindividualOPTIONS0C82BEB7": {
-   "Type": "AWS::ApiGateway::Method",
-   "Properties": {
-    "ApiKeyRequired": false,
     "AuthorizationType": "NONE",
-    "HttpMethod": "OPTIONS",
-    "Integration": {
-     "IntegrationResponses": [
-      {
-       "ResponseParameters": {
-        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'",
-        "method.response.header.Access-Control-Allow-Origin": "'https://edgewoodshowchoirpayments.org'",
-        "method.response.header.Vary": "'Origin'",
-        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'",
-        "method.response.header.Access-Control-Allow-Credentials": "'true'"
-       },
-       "ResponseTemplates": {
-        "application/json": "#set($origin = $input.params().header.get(\"Origin\"))\n#if($origin == \"\")\n  #set($origin = $input.params().header.get(\"origin\"))\n#end\n#if($origin == \"https://www.edgewoodshowchoirpayments.org\" || $origin == \"http://localhost:3000\" || $origin == \"http://localhost:5173\")\n  #set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)\n#end"
-       },
-       "StatusCode": "204"
-      }
-     ],
-     "RequestTemplates": {
-      "application/json": "{ statusCode: 200 }"
-     },
-     "Type": "MOCK"
-    },
-    "MethodResponses": [
-     {
-      "ResponseParameters": {
-       "method.response.header.Access-Control-Allow-Headers": true,
-       "method.response.header.Access-Control-Allow-Origin": true,
-       "method.response.header.Vary": true,
-       "method.response.header.Access-Control-Allow-Methods": true,
-       "method.response.header.Access-Control-Allow-Credentials": true
-      },
-      "StatusCode": "204"
-     }
-    ],
-    "ResourceId": {
-     "Ref": "Apiinvoicesgenerateindividual84E422D5"
-    },
-    "RestApiId": {
-     "Ref": "ApiF70053CD"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/invoices/generate-individual/OPTIONS/Resource"
-   }
-  },
-  "ApiinvoicesgenerateindividualPOSTApiPermissionEhsShowchoirStackApi62088C04POSTinvoicesgenerateindividual51EC28D8": {
-   "Type": "AWS::Lambda::Permission",
-   "Properties": {
-    "Action": "lambda:InvokeFunction",
-    "FunctionName": {
-     "Fn::GetAtt": [
-      "ApiHandler5E7490E8",
-      "Arn"
-     ]
-    },
-    "Principal": "apigateway.amazonaws.com",
-    "SourceArn": {
-     "Fn::Join": [
-      "",
-      [
-       "arn:aws:execute-api:us-east-2:636865837466:",
-       {
-        "Ref": "ApiF70053CD"
-       },
-       "/",
-       {
-        "Ref": "ApiDeploymentStageprod3EB9684E"
-       },
-       "/POST/invoices/generate-individual"
-      ]
-     ]
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/invoices/generate-individual/POST/ApiPermission.EhsShowchoirStackApi62088C04.POST..invoices.generate-individual"
-   }
-  },
-  "ApiinvoicesgenerateindividualPOSTApiPermissionTestEhsShowchoirStackApi62088C04POSTinvoicesgenerateindividualD743E446": {
-   "Type": "AWS::Lambda::Permission",
-   "Properties": {
-    "Action": "lambda:InvokeFunction",
-    "FunctionName": {
-     "Fn::GetAtt": [
-      "ApiHandler5E7490E8",
-      "Arn"
-     ]
-    },
-    "Principal": "apigateway.amazonaws.com",
-    "SourceArn": {
-     "Fn::Join": [
-      "",
-      [
-       "arn:aws:execute-api:us-east-2:636865837466:",
-       {
-        "Ref": "ApiF70053CD"
-       },
-       "/test-invoke-stage/POST/invoices/generate-individual"
-      ]
-     ]
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/invoices/generate-individual/POST/ApiPermission.Test.EhsShowchoirStackApi62088C04.POST..invoices.generate-individual"
-   }
-  },
-  "ApiinvoicesgenerateindividualPOSTCB952379": {
-   "Type": "AWS::ApiGateway::Method",
-   "Properties": {
-    "AuthorizationType": "COGNITO_USER_POOLS",
-    "AuthorizerId": {
-     "Ref": "AuthorizerBD825682"
-    },
-    "HttpMethod": "POST",
-    "Integration": {
-     "IntegrationHttpMethod": "POST",
-     "RequestTemplates": {
-      "application/json": "{ \"statusCode\": \"200\" }"
-     },
-     "Type": "AWS_PROXY",
-     "Uri": {
-      "Fn::Join": [
-       "",
-       [
-        "arn:aws:apigateway:us-east-2:lambda:path/2015-03-31/functions/",
-        {
-         "Fn::GetAtt": [
-          "ApiHandler5E7490E8",
-          "Arn"
-         ]
-        },
-        "/invocations"
-       ]
-      ]
-     }
-    },
-    "ResourceId": {
-     "Ref": "Apiinvoicesgenerateindividual84E422D5"
-    },
-    "RestApiId": {
-     "Ref": "ApiF70053CD"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/invoices/generate-individual/POST/Resource"
-   }
-  },
-  "Apipaymenthistory370FB0AD": {
-   "Type": "AWS::ApiGateway::Resource",
-   "Properties": {
-    "ParentId": {
-     "Fn::GetAtt": [
-      "ApiF70053CD",
-      "RootResourceId"
-     ]
-    },
-    "PathPart": "payment-history",
-    "RestApiId": {
-     "Ref": "ApiF70053CD"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/payment-history/Resource"
-   }
-  },
-  "ApipaymenthistoryOPTIONS873861F5": {
-   "Type": "AWS::ApiGateway::Method",
-   "Properties": {
-    "ApiKeyRequired": false,
-    "AuthorizationType": "NONE",
-    "HttpMethod": "OPTIONS",
-    "Integration": {
-     "IntegrationResponses": [
-      {
-       "ResponseParameters": {
-        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'",
-        "method.response.header.Access-Control-Allow-Origin": "'https://edgewoodshowchoirpayments.org'",
-        "method.response.header.Vary": "'Origin'",
-        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'",
-        "method.response.header.Access-Control-Allow-Credentials": "'true'"
-       },
-       "ResponseTemplates": {
-        "application/json": "#set($origin = $input.params().header.get(\"Origin\"))\n#if($origin == \"\")\n  #set($origin = $input.params().header.get(\"origin\"))\n#end\n#if($origin == \"https://www.edgewoodshowchoirpayments.org\" || $origin == \"http://localhost:3000\" || $origin == \"http://localhost:5173\")\n  #set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)\n#end"
-       },
-       "StatusCode": "204"
-      }
-     ],
-     "RequestTemplates": {
-      "application/json": "{ statusCode: 200 }"
-     },
-     "Type": "MOCK"
-    },
-    "MethodResponses": [
-     {
-      "ResponseParameters": {
-       "method.response.header.Access-Control-Allow-Headers": true,
-       "method.response.header.Access-Control-Allow-Origin": true,
-       "method.response.header.Vary": true,
-       "method.response.header.Access-Control-Allow-Methods": true,
-       "method.response.header.Access-Control-Allow-Credentials": true
-      },
-      "StatusCode": "204"
-     }
-    ],
-    "ResourceId": {
-     "Ref": "Apipaymenthistory370FB0AD"
-    },
-    "RestApiId": {
-     "Ref": "ApiF70053CD"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/payment-history/OPTIONS/Resource"
-   }
-  },
-  "ApipaymenthistoryGETApiPermissionEhsShowchoirStackApi62088C04GETpaymenthistoryE4B045C7": {
-   "Type": "AWS::Lambda::Permission",
-   "Properties": {
-    "Action": "lambda:InvokeFunction",
-    "FunctionName": {
-     "Fn::GetAtt": [
-      "ApiHandler5E7490E8",
-      "Arn"
-     ]
-    },
-    "Principal": "apigateway.amazonaws.com",
-    "SourceArn": {
-     "Fn::Join": [
-      "",
-      [
-       "arn:aws:execute-api:us-east-2:636865837466:",
-       {
-        "Ref": "ApiF70053CD"
-       },
-       "/",
-       {
-        "Ref": "ApiDeploymentStageprod3EB9684E"
-       },
-       "/GET/payment-history"
-      ]
-     ]
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/payment-history/GET/ApiPermission.EhsShowchoirStackApi62088C04.GET..payment-history"
-   }
-  },
-  "ApipaymenthistoryGETApiPermissionTestEhsShowchoirStackApi62088C04GETpaymenthistory5B720F8B": {
-   "Type": "AWS::Lambda::Permission",
-   "Properties": {
-    "Action": "lambda:InvokeFunction",
-    "FunctionName": {
-     "Fn::GetAtt": [
-      "ApiHandler5E7490E8",
-      "Arn"
-     ]
-    },
-    "Principal": "apigateway.amazonaws.com",
-    "SourceArn": {
-     "Fn::Join": [
-      "",
-      [
-       "arn:aws:execute-api:us-east-2:636865837466:",
-       {
-        "Ref": "ApiF70053CD"
-       },
-       "/test-invoke-stage/GET/payment-history"
-      ]
-     ]
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/payment-history/GET/ApiPermission.Test.EhsShowchoirStackApi62088C04.GET..payment-history"
-   }
-  },
-  "ApipaymenthistoryGET1A372C7E": {
-   "Type": "AWS::ApiGateway::Method",
-   "Properties": {
-    "AuthorizationType": "COGNITO_USER_POOLS",
-    "AuthorizerId": {
-     "Ref": "AuthorizerBD825682"
-    },
     "HttpMethod": "GET",
     "Integration": {
      "IntegrationHttpMethod": "POST",
-     "RequestTemplates": {
-      "application/json": "{ \"statusCode\": \"200\" }"
-     },
      "Type": "AWS_PROXY",
      "Uri": {
       "Fn::Join": [
@@ -2866,7 +1533,7 @@
         "arn:aws:apigateway:us-east-2:lambda:path/2015-03-31/functions/",
         {
          "Fn::GetAtt": [
-          "ApiHandler5E7490E8",
+          "PaymentsLambda27AA6830",
           "Arn"
          ]
         },
@@ -2876,23 +1543,23 @@
      }
     },
     "ResourceId": {
-     "Ref": "Apipaymenthistory370FB0AD"
+     "Ref": "Apipayments63A247CD"
     },
     "RestApiId": {
      "Ref": "ApiF70053CD"
     }
    },
    "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/payment-history/GET/Resource"
+    "aws:cdk:path": "EhsShowchoirStack/Api/Default/payments/GET/Resource"
    }
   },
-  "ApipaymenthistoryPOSTApiPermissionEhsShowchoirStackApi62088C04POSTpaymenthistory8F87C742": {
+  "ApipaymentsPOSTApiPermissionEhsShowchoirStackApi62088C04POSTpaymentsCEA801FB": {
    "Type": "AWS::Lambda::Permission",
    "Properties": {
     "Action": "lambda:InvokeFunction",
     "FunctionName": {
      "Fn::GetAtt": [
-      "ApiHandler5E7490E8",
+      "PaymentsLambda27AA6830",
       "Arn"
      ]
     },
@@ -2909,22 +1576,22 @@
        {
         "Ref": "ApiDeploymentStageprod3EB9684E"
        },
-       "/POST/payment-history"
+       "/POST/payments"
       ]
      ]
     }
    },
    "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/payment-history/POST/ApiPermission.EhsShowchoirStackApi62088C04.POST..payment-history"
+    "aws:cdk:path": "EhsShowchoirStack/Api/Default/payments/POST/ApiPermission.EhsShowchoirStackApi62088C04.POST..payments"
    }
   },
-  "ApipaymenthistoryPOSTApiPermissionTestEhsShowchoirStackApi62088C04POSTpaymenthistory56735873": {
+  "ApipaymentsPOSTApiPermissionTestEhsShowchoirStackApi62088C04POSTpaymentsD3220B90": {
    "Type": "AWS::Lambda::Permission",
    "Properties": {
     "Action": "lambda:InvokeFunction",
     "FunctionName": {
      "Fn::GetAtt": [
-      "ApiHandler5E7490E8",
+      "PaymentsLambda27AA6830",
       "Arn"
      ]
     },
@@ -2937,28 +1604,22 @@
        {
         "Ref": "ApiF70053CD"
        },
-       "/test-invoke-stage/POST/payment-history"
+       "/test-invoke-stage/POST/payments"
       ]
      ]
     }
    },
    "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/payment-history/POST/ApiPermission.Test.EhsShowchoirStackApi62088C04.POST..payment-history"
+    "aws:cdk:path": "EhsShowchoirStack/Api/Default/payments/POST/ApiPermission.Test.EhsShowchoirStackApi62088C04.POST..payments"
    }
   },
-  "ApipaymenthistoryPOST9A17E45A": {
+  "ApipaymentsPOSTDC87FFD1": {
    "Type": "AWS::ApiGateway::Method",
    "Properties": {
-    "AuthorizationType": "COGNITO_USER_POOLS",
-    "AuthorizerId": {
-     "Ref": "AuthorizerBD825682"
-    },
+    "AuthorizationType": "NONE",
     "HttpMethod": "POST",
     "Integration": {
      "IntegrationHttpMethod": "POST",
-     "RequestTemplates": {
-      "application/json": "{ \"statusCode\": \"200\" }"
-     },
      "Type": "AWS_PROXY",
      "Uri": {
       "Fn::Join": [
@@ -2967,7 +1628,7 @@
         "arn:aws:apigateway:us-east-2:lambda:path/2015-03-31/functions/",
         {
          "Fn::GetAtt": [
-          "ApiHandler5E7490E8",
+          "PaymentsLambda27AA6830",
           "Arn"
          ]
         },
@@ -2977,239 +1638,14 @@
      }
     },
     "ResourceId": {
-     "Ref": "Apipaymenthistory370FB0AD"
+     "Ref": "Apipayments63A247CD"
     },
     "RestApiId": {
      "Ref": "ApiF70053CD"
     }
    },
    "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Api/Default/payment-history/POST/Resource"
-   }
-  },
-  "AuthorizerBD825682": {
-   "Type": "AWS::ApiGateway::Authorizer",
-   "Properties": {
-    "IdentitySource": "method.request.header.Authorization",
-    "Name": "EhsShowchoirStackAuthorizerBB627581",
-    "ProviderARNs": [
-     {
-      "Fn::GetAtt": [
-       "UserPool6BA7E5F2",
-       "Arn"
-      ]
-     }
-    ],
-    "RestApiId": {
-     "Ref": "ApiF70053CD"
-    },
-    "Type": "COGNITO_USER_POOLS"
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Authorizer/Resource"
-   }
-  },
-  "Certificate4E7ABB08": {
-   "Type": "AWS::CertificateManager::Certificate",
-   "Properties": {
-    "DomainName": "edgewoodshowchoirpayments.org",
-    "SubjectAlternativeNames": [
-     "www.edgewoodshowchoirpayments.org"
-    ],
-    "Tags": [
-     {
-      "Key": "Name",
-      "Value": "EhsShowchoirStack/Certificate"
-     }
-    ],
-    "ValidationMethod": "DNS"
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Certificate/Resource"
-   }
-  },
-  "OAIE1EFC67F": {
-   "Type": "AWS::CloudFront::CloudFrontOriginAccessIdentity",
-   "Properties": {
-    "CloudFrontOriginAccessIdentityConfig": {
-     "Comment": "OAI for edgewoodshowchoirpayments.org"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/OAI/Resource"
-   }
-  },
-  "Distribution830FAC52": {
-   "Type": "AWS::CloudFront::Distribution",
-   "Properties": {
-    "DistributionConfig": {
-     "Aliases": [
-      "edgewoodshowchoirpayments.org",
-      "www.edgewoodshowchoirpayments.org"
-     ],
-     "CacheBehaviors": [
-      {
-       "AllowedMethods": [
-        "GET",
-        "HEAD",
-        "OPTIONS",
-        "PUT",
-        "PATCH",
-        "POST",
-        "DELETE"
-       ],
-       "CachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",
-       "Compress": true,
-       "OriginRequestPolicyId": "88a5eaf4-2fd4-4709-b370-b4c650ea3fcf",
-       "PathPattern": "/api/*",
-       "TargetOriginId": "EhsShowchoirStackDistributionOrigin288966B75",
-       "ViewerProtocolPolicy": "redirect-to-https"
-      }
-     ],
-     "Comment": "EHS Show Choir Payment System Distribution",
-     "CustomErrorResponses": [
-      {
-       "ErrorCachingMinTTL": 300,
-       "ErrorCode": 404,
-       "ResponseCode": 200,
-       "ResponsePagePath": "/index.html"
-      },
-      {
-       "ErrorCachingMinTTL": 300,
-       "ErrorCode": 403,
-       "ResponseCode": 200,
-       "ResponsePagePath": "/index.html"
-      }
-     ],
-     "DefaultCacheBehavior": {
-      "AllowedMethods": [
-       "GET",
-       "HEAD",
-       "OPTIONS"
-      ],
-      "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6",
-      "Compress": true,
-      "ResponseHeadersPolicyId": "67f7725c-6f97-4210-82d7-5512b31e9d03",
-      "TargetOriginId": "EhsShowchoirStackDistributionOrigin1EE09CE1D",
-      "ViewerProtocolPolicy": "redirect-to-https"
-     },
-     "DefaultRootObject": "index.html",
-     "Enabled": true,
-     "HttpVersion": "http2",
-     "IPV6Enabled": true,
-     "Origins": [
-      {
-       "DomainName": {
-        "Fn::GetAtt": [
-         "WebsiteBucket75C24D94",
-         "RegionalDomainName"
-        ]
-       },
-       "Id": "EhsShowchoirStackDistributionOrigin1EE09CE1D",
-       "S3OriginConfig": {
-        "OriginAccessIdentity": {
-         "Fn::Join": [
-          "",
-          [
-           "origin-access-identity/cloudfront/",
-           {
-            "Ref": "OAIE1EFC67F"
-           }
-          ]
-         ]
-        }
-       }
-      },
-      {
-       "CustomOriginConfig": {
-        "OriginProtocolPolicy": "https-only",
-        "OriginSSLProtocols": [
-         "TLSv1.2"
-        ]
-       },
-       "DomainName": {
-        "Fn::Select": [
-         2,
-         {
-          "Fn::Split": [
-           "/",
-           {
-            "Fn::Join": [
-             "",
-             [
-              "https://",
-              {
-               "Ref": "ApiF70053CD"
-              },
-              ".execute-api.us-east-2.",
-              {
-               "Ref": "AWS::URLSuffix"
-              },
-              "/",
-              {
-               "Ref": "ApiDeploymentStageprod3EB9684E"
-              },
-              "/"
-             ]
-            ]
-           }
-          ]
-         }
-        ]
-       },
-       "Id": "EhsShowchoirStackDistributionOrigin288966B75",
-       "OriginPath": {
-        "Fn::Join": [
-         "",
-         [
-          "/",
-          {
-           "Fn::Select": [
-            3,
-            {
-             "Fn::Split": [
-              "/",
-              {
-               "Fn::Join": [
-                "",
-                [
-                 "https://",
-                 {
-                  "Ref": "ApiF70053CD"
-                 },
-                 ".execute-api.us-east-2.",
-                 {
-                  "Ref": "AWS::URLSuffix"
-                 },
-                 "/",
-                 {
-                  "Ref": "ApiDeploymentStageprod3EB9684E"
-                 },
-                 "/"
-                ]
-               ]
-              }
-             ]
-            }
-           ]
-          }
-         ]
-        ]
-       }
-      }
-     ],
-     "PriceClass": "PriceClass_100",
-     "ViewerCertificate": {
-      "AcmCertificateArn": {
-       "Ref": "Certificate4E7ABB08"
-      },
-      "MinimumProtocolVersion": "TLSv1.2_2021",
-      "SslSupportMethod": "sni-only"
-     }
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Distribution/Resource"
+    "aws:cdk:path": "EhsShowchoirStack/Api/Default/payments/POST/Resource"
    }
   },
   "EmailIdentity7187767D": {
@@ -3233,7 +1669,7 @@
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
-    "Analytics": "v2:deflate64:H4sIAAAAAAAA/21T0W7bMAz8lr0r2pZuH5A6KzBgQ4N0ey4UifHYSGIgSi0ywf8+ybIXt+gT78gTSZ/ktVx/XstPH9QLr7Q5rSweZH6ISp9EST1mvpH5NukTRNEd/YRa2JFFfbmmJ97IrWIYhLl45ciUlr/UwULVjmAQmnqPkWT+zRB2RLbW/uMZbMkp9MvSlJlpZxF8XApaZhConMx7akPHeN23oUFY5Q5GyXyXvI5I46Al3kFwyFzYIPjmUTFDZLmpQVjqWf6gfg+xzKsH1Bl7FeFFXcpg4Lg54zh7gls4W7q4ad0FK27345YNFD2loKE6KH5C/EOmFic0V6fOE25mzhbwJhVtwL8QquzKiu0QIh5Rlz2d8mVckLm75qp8QYveUjLHQD7KfB+wR7/RGpi/m/rRcXSzq5q7qnlXsUWOAQ9pNnXJi63AMn8rd2qXLd8kyB+xT0HVIw/tJb7NDYPoEkdy7xv0qrQL9IwGwujweJvVefT9K3fvUzyn8pA8GZBP/PF5/UV+LX/KEyOuQiqrOZD7Fv8BraRHgUYDAAA="
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/21Sy07DMBD8Fu6ugQAf0AdIHBBRC2fkxNuwre2N/GgVWfl3nBcNFaedndnMjrXJeHaf8bsbcXaLUh4XCgsed16UR5aor+geeFyF8gierfdmREPJSWHZXOihb1kJ1uMeS+FBCyMqsDyuL1z3waxN84qC3FsynscNOm+xCB7JdIPzvmWyMUKTTAk/RKF6px4kD6oMeuLx04HNiVSn/eIJrBWC8XNpZKZ2Q1qgmQ8MTMtQaB63NCztasuU0IUUPL4EU0555zgHq9G5PrmosUqPPYsmuYDzyxp7oxFuoFbU6DHcrEuXqPqVA0jzFGwJK+GAvYH/JtmJI5rU0bnHLXPgeHxOr1CvMlmi7092RZDZYxWs6LLvhltfc23L1sF50v+tuZJySyeUYPucS+fAd/nRVH8yvgdfB98yQxL4wd2eskf+lP7Fg0Nc2JCiaeDbof4AC+dRaqgCAAA="
    },
    "Metadata": {
     "aws:cdk:path": "EhsShowchoirStack/CDKMetadata/Default"
@@ -3264,33 +1700,12 @@
    }
   },
   "WebsiteBucketName": {
-   "Description": "S3 Bucket for website hosting",
+   "Description": "Website S3 Bucket Name",
    "Value": {
     "Ref": "WebsiteBucket75C24D94"
    },
    "Export": {
-    "Name": "EhsShowchoir-WebsiteBucket"
-   }
-  },
-  "InvoicesBucketName": {
-   "Description": "S3 Bucket for invoice storage",
-   "Value": {
-    "Ref": "InvoicesBucket57FCB164"
-   },
-   "Export": {
-    "Name": "EhsShowchoir-InvoicesBucket"
-   }
-  },
-  "CloudFrontDomainName": {
-   "Description": "CloudFront Distribution Domain Name",
-   "Value": {
-    "Fn::GetAtt": [
-     "Distribution830FAC52",
-     "DomainName"
-    ]
-   },
-   "Export": {
-    "Name": "EhsShowchoir-CloudFrontDomain"
+    "Name": "EhsShowchoir-WebsiteBucketName"
    }
   },
   "CloudFrontDistributionId": {
@@ -3299,7 +1714,7 @@
     "Ref": "Distribution830FAC52"
    },
    "Export": {
-    "Name": "EhsShowchoir-DistributionId"
+    "Name": "EhsShowchoir-CloudFrontDistributionId"
    }
   },
   "ApiUrl": {
@@ -3347,39 +1762,62 @@
    }
   },
   "CognitoDomain": {
-   "Description": "Cognito Hosted UI Domain",
+   "Description": "Cognito Domain URL",
    "Value": {
-    "Ref": "UserPoolCognitoDomainD6C7F9FA"
+    "Fn::Join": [
+     "",
+     [
+      "https://",
+      {
+       "Ref": "UserPoolDomain5479B217"
+      },
+      ".auth.us-east-2.amazoncognito.com"
+     ]
+    ]
    },
    "Export": {
     "Name": "EhsShowchoir-CognitoDomain"
    }
   },
-  "CertificateArn": {
-   "Description": "SSL Certificate ARN",
-   "Value": {
-    "Ref": "Certificate4E7ABB08"
-   },
+  "WebsiteUrl": {
+   "Description": "Website URL",
+   "Value": "https://edgewoodshowchoirpayments.org",
    "Export": {
-    "Name": "EhsShowchoir-CertificateArn"
+    "Name": "EhsShowchoir-WebsiteUrl"
    }
   },
-  "StudentsTableName": {
-   "Description": "DynamoDB Students Table Name",
+  "CloudFrontUrl": {
+   "Description": "CloudFront Distribution URL",
    "Value": {
-    "Ref": "StudentsTableDAB56938"
+    "Fn::Join": [
+     "",
+     [
+      "https://",
+      {
+       "Fn::GetAtt": [
+        "Distribution830FAC52",
+        "DomainName"
+       ]
+      }
+     ]
+    ]
    },
    "Export": {
-    "Name": "EhsShowchoir-StudentsTable"
+    "Name": "EhsShowchoir-CloudFrontUrl"
    }
   },
-  "PaymentHistoryTableName": {
-   "Description": "DynamoDB Payment History Table Name",
-   "Value": {
-    "Ref": "PaymentHistoryTableB1149501"
-   },
+  "Region": {
+   "Description": "AWS Region",
+   "Value": "us-east-2",
    "Export": {
-    "Name": "EhsShowchoir-PaymentHistoryTable"
+    "Name": "EhsShowchoir-Region"
+   }
+  },
+  "StackName": {
+   "Description": "CloudFormation Stack Name",
+   "Value": "EhsShowchoirStack",
+   "Export": {
+    "Name": "EhsShowchoir-StackName"
    }
   }
  },

@@ -1,82 +1,77 @@
-import { Stack, StackProps, CfnOutput } from 'aws-cdk-lib';
-import * as cdk from 'aws-cdk-lib';
+import { Stack, StackProps, CfnOutput, Duration, RemovalPolicy } from 'aws-cdk-lib';
+import { Construct } from 'constructs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
-import * as certificatemanager from 'aws-cdk-lib/aws-certificatemanager';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
-import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as ses from 'aws-cdk-lib/aws-ses';
-import * as iam from 'aws-cdk-lib/aws-iam';
-import * as logs from 'aws-cdk-lib/aws-logs';
-import { CfnOutput, Construct } from 'constructs';
 
-interface EhsShowchoirStackProps extends cdk.StackProps {
-  domainName?: string;
-  certificateArn?: string;
-}
-
-export class EhsShowchoirStack extends cdk.Stack {
+export class EhsShowchoirStack extends Stack {
+  public readonly websiteBucket: s3.Bucket;
+  public readonly invoicesBucket: s3.Bucket;
   public readonly distribution: cloudfront.Distribution;
   public readonly api: apigateway.RestApi;
   public readonly userPool: cognito.UserPool;
+  public readonly userPoolClient: cognito.UserPoolClient;
+  public readonly userPoolDomain: cognito.UserPoolDomain;
+  public readonly studentsTable: dynamodb.Table;
+  public readonly paymentHistoryTable: dynamodb.Table;
+  public readonly parentStudentTable: dynamodb.Table;
+  public readonly invoiceLogTable: dynamodb.Table;
 
-  constructor(scope: Construct, id: string, props: EhsShowchoirStackProps = {}) {
+  constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
-    const domainName = props.domainName || 'edgewoodshowchoirpayments.org';
+    const domainName = 'edgewoodshowchoirpayments.org';
 
     // ==========================================
     // S3 BUCKETS
     // ==========================================
 
     // Website hosting bucket
-    const websiteBucket = new s3.Bucket(this, 'WebsiteBucket', {
-      bucketName: `ehsshowchoir-website-${this.account}-${this.region}`,
-      publicReadAccess: false,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    this.websiteBucket = new s3.Bucket(this, 'WebsiteBucket', {
+      bucketName: 'ehsshowchoir-website-bucket',
+      websiteIndexDocument: 'index.html',
+      websiteErrorDocument: 'error.html',
+      publicReadAccess: true,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ACLS,
+      removalPolicy: RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
-      versioned: true,
-      lifecycleRules: [
-        {
-          id: 'DeleteOldVersions',
-          noncurrentVersionExpiration: cdk.Duration.days(30),
-          enabled: true,
-        },
-      ],
     });
 
-    // Invoice storage bucket
-    const invoicesBucket = new s3.Bucket(this, 'InvoicesBucket', {
-      bucketName: `ehsshowchoir-invoices-${this.account}-${this.region}`,
-      publicReadAccess: false,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    // Invoices storage bucket
+    this.invoicesBucket = new s3.Bucket(this, 'InvoicesBucket', {
+      bucketName: 'ehsshowchoir-invoices',
       versioned: true,
-      lifecycleRules: [
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      removalPolicy: RemovalPolicy.RETAIN,
+    });
+
+    // ==========================================
+    // CLOUDFRONT DISTRIBUTION (WITHOUT SSL)
+    // ==========================================
+
+    this.distribution = new cloudfront.Distribution(this, 'Distribution', {
+      defaultBehavior: {
+        origin: new origins.S3BucketOrigin(this.websiteBucket),
+        allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+      },
+      // Removed domainNames and certificate to avoid SSL validation delay
+      defaultRootObject: 'index.html',
+      errorResponses: [
         {
-          id: 'ArchiveOldInvoices',
-          transitions: [
-            {
-              storageClass: s3.StorageClass.INFREQUENT_ACCESS,
-              transitionAfter: cdk.Duration.days(90),
-            },
-            {
-              storageClass: s3.StorageClass.GLACIER,
-              transitionAfter: cdk.Duration.days(365),
-            },
-          ],
-          enabled: true,
-        },
-        {
-          id: 'DeleteVeryOldInvoices',
-          expiration: cdk.Duration.days(2555), // 7 years for tax compliance
-          enabled: true,
+          httpStatus: 404,
+          responseHttpStatus: 200,
+          responsePagePath: '/index.html',
         },
       ],
+      comment: 'EHS Show Choir Payment System Distribution (No Custom Domain)',
     });
 
     // ==========================================
@@ -84,74 +79,47 @@ export class EhsShowchoirStack extends cdk.Stack {
     // ==========================================
 
     // Students table
-    const studentsTable = new dynamodb.Table(this, 'StudentsTable', {
+    this.studentsTable = new dynamodb.Table(this, 'StudentsTable', {
       tableName: 'ehsshowchoir-students',
-      partitionKey: { name: 'id', type: dynamodb.AttributeType.STRING },
+      partitionKey: { name: 'studentId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-      pointInTimeRecovery: true,
-      stream: dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
-    });
-
-    // Add GSI for parent email lookups
-    studentsTable.addGlobalSecondaryIndex({
-      indexName: 'ParentEmailIndex',
-      partitionKey: { name: 'parentEmail', type: dynamodb.AttributeType.STRING },
-    });
-
-    // Add GSI for status filtering
-    studentsTable.addGlobalSecondaryIndex({
-      indexName: 'StatusIndex',
-      partitionKey: { name: 'status', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'createdAt', type: dynamodb.AttributeType.STRING },
+      removalPolicy: RemovalPolicy.RETAIN,
+      pointInTimeRecoverySpecification: {
+        pointInTimeRecoveryEnabled: true,
+      },
     });
 
     // Payment history table
-    const paymentHistoryTable = new dynamodb.Table(this, 'PaymentHistoryTable', {
+    this.paymentHistoryTable = new dynamodb.Table(this, 'PaymentHistoryTable', {
       tableName: 'ehsshowchoir-payment-history',
-      partitionKey: { name: 'id', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'transaction_date', type: dynamodb.AttributeType.STRING },
+      partitionKey: { name: 'paymentId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'timestamp', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-      pointInTimeRecovery: true,
-      stream: dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
-    });
-
-    // Add GSI for student lookups
-    paymentHistoryTable.addGlobalSecondaryIndex({
-      indexName: 'StudentIdIndex',
-      partitionKey: { name: 'student_id', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'transaction_date', type: dynamodb.AttributeType.STRING },
-    });
-
-    // Add GSI for parent email lookups
-    paymentHistoryTable.addGlobalSecondaryIndex({
-      indexName: 'ParentEmailIndex',
-      partitionKey: { name: 'parent_email', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'transaction_date', type: dynamodb.AttributeType.STRING },
-    });
-
-    // Invoice log table
-    const invoiceLogTable = new dynamodb.Table(this, 'InvoiceLogTable', {
-      tableName: 'ehsshowchoir-invoice-log',
-      partitionKey: { name: 'id', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'created_at', type: dynamodb.AttributeType.STRING },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-      timeToLiveAttribute: 'ttl',
+      removalPolicy: RemovalPolicy.RETAIN,
+      pointInTimeRecoverySpecification: {
+        pointInTimeRecoveryEnabled: true,
+      },
     });
 
     // Parent-student relationships table
-    const parentStudentTable = new dynamodb.Table(this, 'ParentStudentTable', {
+    this.parentStudentTable = new dynamodb.Table(this, 'ParentStudentTable', {
       tableName: 'ehsshowchoir-parent-student-relationships',
-      partitionKey: { name: 'parent_email', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'student_id', type: dynamodb.AttributeType.STRING },
+      partitionKey: { name: 'parentEmail', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'studentId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      removalPolicy: RemovalPolicy.RETAIN,
+    });
+
+    // Invoice log table
+    this.invoiceLogTable = new dynamodb.Table(this, 'InvoiceLogTable', {
+      tableName: 'ehsshowchoir-invoice-log',
+      partitionKey: { name: 'invoiceId', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: RemovalPolicy.RETAIN,
     });
 
     // ==========================================
-    // COGNITO AUTHENTICATION
+    // COGNITO USER POOL
     // ==========================================
 
     this.userPool = new cognito.UserPool(this, 'UserPool', {
@@ -159,84 +127,53 @@ export class EhsShowchoirStack extends cdk.Stack {
       selfSignUpEnabled: true,
       signInAliases: {
         email: true,
-        username: false,
       },
-      autoVerify: {
-        email: true,
+      standardAttributes: {
+        email: {
+          required: true,
+          mutable: true,
+        },
+        givenName: {
+          required: true,
+          mutable: true,
+        },
+        familyName: {
+          required: true,
+          mutable: true,
+        },
       },
       passwordPolicy: {
         minLength: 8,
         requireLowercase: true,
         requireUppercase: true,
         requireDigits: true,
-        requireSymbols: true,
+        requireSymbols: false,
       },
-      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-      userInvitation: {
-        emailSubject: 'Welcome to Edgewood Show Choir Payment Portal',
-        emailBody: 'Hello {username}, your temporary password is {####}',
+      autoVerify: {
+        email: true,
       },
-      userVerification: {
-        emailSubject: 'Verify your email for Edgewood Show Choir',
-        emailBody: 'Your verification code is {####}',
-      },
+      removalPolicy: RemovalPolicy.RETAIN,
     });
 
-    // Add custom domain for Cognito
-    const userPoolDomain = this.userPool.addDomain('CognitoDomain', {
-      cognitoDomain: {
-        domainPrefix: 'ehsshowchoir-auth',
-      },
-    });
-
-    const userPoolClient = new cognito.UserPoolClient(this, 'UserPoolClient', {
+    this.userPoolClient = new cognito.UserPoolClient(this, 'UserPoolClient', {
       userPool: this.userPool,
-      generateSecret: false,
       authFlows: {
         adminUserPassword: true,
         userPassword: true,
         userSrp: true,
       },
-      oAuth: {
-        flows: {
-          authorizationCodeGrant: true,
-        },
-        scopes: [
-          cognito.OAuthScope.EMAIL,
-          cognito.OAuthScope.OPENID,
-          cognito.OAuthScope.PROFILE,
-        ],
-        callbackUrls: [
-          `https://${domainName}/auth/callback`,
-          `https://${domainName}/`,
-          'http://localhost:3000/auth/callback',
-          'http://localhost:3000/',
-        ],
-        logoutUrls: [
-          `https://${domainName}/auth/logout`,
-          `https://${domainName}/`,
-          'http://localhost:3000/auth/logout',
-          'http://localhost:3000/',
-        ],
+      generateSecret: false,
+    });
+
+    this.userPoolDomain = new cognito.UserPoolDomain(this, 'UserPoolDomain', {
+      userPool: this.userPool,
+      cognitoDomain: {
+        domainPrefix: 'ehsshowchoir-auth',
       },
-      readAttributes: new cognito.ClientAttributes()
-        .withStandardAttributes({
-          email: true,
-          emailVerified: true,
-          givenName: true,
-          familyName: true,
-        }),
-      writeAttributes: new cognito.ClientAttributes()
-        .withStandardAttributes({
-          email: true,
-          givenName: true,
-          familyName: true,
-        }),
     });
 
     // ==========================================
-    // IAM ROLES AND POLICIES
+    // IAM ROLE FOR LAMBDA
     // ==========================================
 
     const lambdaRole = new iam.Role(this, 'LambdaRole', {
@@ -256,16 +193,12 @@ export class EhsShowchoirStack extends cdk.Stack {
                 'dynamodb:DeleteItem',
                 'dynamodb:Query',
                 'dynamodb:Scan',
-                'dynamodb:BatchGetItem',
-                'dynamodb:BatchWriteItem',
               ],
               resources: [
-                studentsTable.tableArn,
-                paymentHistoryTable.tableArn,
-                invoiceLogTable.tableArn,
-                parentStudentTable.tableArn,
-                `${studentsTable.tableArn}/index/*`,
-                `${paymentHistoryTable.tableArn}/index/*`,
+                this.studentsTable.tableArn,
+                this.paymentHistoryTable.tableArn,
+                this.parentStudentTable.tableArn,
+                this.invoiceLogTable.tableArn,
               ],
             }),
           ],
@@ -278,10 +211,9 @@ export class EhsShowchoirStack extends cdk.Stack {
                 's3:GetObject',
                 's3:PutObject',
                 's3:DeleteObject',
-                's3:GetSignedUrl',
               ],
               resources: [
-                `${invoicesBucket.bucketArn}/*`,
+                `${this.invoicesBucket.bucketArn}/*`,
               ],
             }),
           ],
@@ -293,23 +225,8 @@ export class EhsShowchoirStack extends cdk.Stack {
               actions: [
                 'ses:SendEmail',
                 'ses:SendRawEmail',
-                'ses:SendBulkTemplatedEmail',
               ],
               resources: ['*'],
-            }),
-          ],
-        }),
-        CognitoAccess: new iam.PolicyDocument({
-          statements: [
-            new iam.PolicyStatement({
-              effect: iam.Effect.ALLOW,
-              actions: [
-                'cognito-idp:AdminGetUser',
-                'cognito-idp:AdminListGroupsForUser',
-                'cognito-idp:AdminAddUserToGroup',
-                'cognito-idp:AdminRemoveUserFromGroup',
-              ],
-              resources: [this.userPool.userPoolArn],
             }),
           ],
         }),
@@ -320,49 +237,54 @@ export class EhsShowchoirStack extends cdk.Stack {
     // LAMBDA FUNCTIONS
     // ==========================================
 
-    // Main API Lambda
-    const apiHandler = new lambda.Function(this, 'ApiHandler', {
+    // Students API Lambda
+    const studentsLambda = new lambda.Function(this, 'StudentsLambda', {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: 'index.handler',
-      code: lambda.Code.fromAsset('lambda'),
+      code: lambda.Code.fromInline(`
+        exports.handler = async (event) => {
+          console.log('Students API called:', JSON.stringify(event, null, 2));
+          return {
+            statusCode: 200,
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Headers': 'Content-Type',
+              'Access-Control-Allow-Methods': 'OPTIONS,POST,GET,PUT,DELETE'
+            },
+            body: JSON.stringify({
+              message: 'Students API - Implementation needed',
+              event: event
+            }),
+          };
+        };
+      `),
       role: lambdaRole,
-      environment: {
-        STUDENTS_TABLE: studentsTable.tableName,
-        PAYMENT_HISTORY_TABLE: paymentHistoryTable.tableName,
-        INVOICE_LOG_TABLE: invoiceLogTable.tableName,
-        PARENT_STUDENT_TABLE: parentStudentTable.tableName,
-        INVOICES_BUCKET: invoicesBucket.bucketName,
-        USER_POOL_ID: this.userPool.userPoolId,
-        FROM_EMAIL: `treasurer@${domainName}`,
-        DOMAIN_NAME: domainName,
-        AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1',
-      },
-      timeout: cdk.Duration.seconds(30),
-      memorySize: 512,
-      logRetention: logs.RetentionDays.ONE_MONTH,
-      description: 'Main API handler for EHS Show Choir',
+      timeout: Duration.seconds(30),
     });
 
-    // Bulk Invoice Lambda
-    const bulkInvoiceHandler = new lambda.Function(this, 'BulkInvoiceHandler', {
+    // Payments API Lambda
+    const paymentsLambda = new lambda.Function(this, 'PaymentsLambda', {
       runtime: lambda.Runtime.NODEJS_18_X,
-      handler: 'bulk-invoice-handler.bulkInvoiceHandler',
-      code: lambda.Code.fromAsset('lambda'),
+      handler: 'index.handler',
+      code: lambda.Code.fromInline(`
+        exports.handler = async (event) => {
+          console.log('Payments API called:', JSON.stringify(event, null, 2));
+          return {
+            statusCode: 200,
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Headers': 'Content-Type',
+              'Access-Control-Allow-Methods': 'OPTIONS,POST,GET,PUT,DELETE'
+            },
+            body: JSON.stringify({
+              message: 'Payments API - Implementation needed',
+              event: event
+            }),
+          };
+        };
+      `),
       role: lambdaRole,
-      environment: {
-        STUDENTS_TABLE: studentsTable.tableName,
-        PAYMENT_HISTORY_TABLE: paymentHistoryTable.tableName,
-        INVOICE_LOG_TABLE: invoiceLogTable.tableName,
-        PARENT_STUDENT_TABLE: parentStudentTable.tableName,
-        INVOICES_BUCKET: invoicesBucket.bucketName,
-        FROM_EMAIL: `treasurer@${domainName}`,
-        DOMAIN_NAME: domainName,
-        AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1',
-      },
-      timeout: cdk.Duration.minutes(15),
-      memorySize: 1024,
-      logRetention: logs.RetentionDays.ONE_MONTH,
-      description: 'Bulk invoice processing for EHS Show Choir',
+      timeout: Duration.seconds(30),
     });
 
     // ==========================================
@@ -370,150 +292,29 @@ export class EhsShowchoirStack extends cdk.Stack {
     // ==========================================
 
     this.api = new apigateway.RestApi(this, 'Api', {
-      restApiName: 'ehsshowchoir-api',
-      description: 'EHS Show Choir Payment System API',
+      restApiName: 'EHS Show Choir API',
+      description: 'API for EHS Show Choir Payment System',
       defaultCorsPreflightOptions: {
-        allowOrigins: [
-          `https://${domainName}`,
-          `https://www.${domainName}`,
-          'http://localhost:3000',
-          'http://localhost:5173',
-        ],
+        allowOrigins: apigateway.Cors.ALL_ORIGINS,
         allowMethods: apigateway.Cors.ALL_METHODS,
-        allowHeaders: [
-          'Content-Type',
-          'X-Amz-Date',
-          'Authorization',
-          'X-Api-Key',
-          'X-Amz-Security-Token',
-          'X-Amz-User-Agent',
-        ],
-        allowCredentials: true,
-      },
-      deployOptions: {
-        stageName: 'prod',
-        loggingLevel: apigateway.MethodLoggingLevel.INFO,
-        dataTraceEnabled: true,
+        allowHeaders: ['Content-Type', 'Authorization'],
       },
     });
 
-    // API Gateway Authorizer
-    const authorizer = new apigateway.CognitoUserPoolsAuthorizer(this, 'Authorizer', {
-      cognitoUserPools: [this.userPool],
-      identitySource: 'method.request.header.Authorization',
-    });
-
-    // API integrations
-    const apiIntegration = new apigateway.LambdaIntegration(apiHandler, {
-      requestTemplates: { 'application/json': '{ "statusCode": "200" }' },
-    });
-    
-    const bulkInvoiceIntegration = new apigateway.LambdaIntegration(bulkInvoiceHandler, {
-      requestTemplates: { 'application/json': '{ "statusCode": "200" }' },
-    });
-
-    // API Routes
-    // Public routes
-    const healthResource = this.api.root.addResource('health');
-    healthResource.addMethod('GET', apiIntegration);
-
-    // Protected routes
+    // Students API endpoints
     const studentsResource = this.api.root.addResource('students');
-    studentsResource.addMethod('GET', apiIntegration, { authorizer });
-    studentsResource.addMethod('POST', apiIntegration, { authorizer });
+    studentsResource.addMethod('GET', new apigateway.LambdaIntegration(studentsLambda));
+    studentsResource.addMethod('POST', new apigateway.LambdaIntegration(studentsLambda));
 
     const studentResource = studentsResource.addResource('{studentId}');
-    studentResource.addMethod('GET', apiIntegration, { authorizer });
-    studentResource.addMethod('PUT', apiIntegration, { authorizer });
-    studentResource.addMethod('DELETE', apiIntegration, { authorizer });
+    studentResource.addMethod('GET', new apigateway.LambdaIntegration(studentsLambda));
+    studentResource.addMethod('PUT', new apigateway.LambdaIntegration(studentsLambda));
+    studentResource.addMethod('DELETE', new apigateway.LambdaIntegration(studentsLambda));
 
-    const studentInvoiceDataResource = studentResource.addResource('invoice-data');
-    studentInvoiceDataResource.addMethod('GET', apiIntegration, { authorizer });
-
-    const studentPaymentHistoryResource = studentResource.addResource('payment-history');
-    studentPaymentHistoryResource.addMethod('GET', apiIntegration, { authorizer });
-
-    const invoicesResource = this.api.root.addResource('invoices');
-    const bulkSendResource = invoicesResource.addResource('bulk-send');
-    bulkSendResource.addMethod('POST', bulkInvoiceIntegration, { authorizer });
-
-    const generateIndividualResource = invoicesResource.addResource('generate-individual');
-    generateIndividualResource.addMethod('POST', apiIntegration, { authorizer });
-
-    const paymentHistoryResource = this.api.root.addResource('payment-history');
-    paymentHistoryResource.addMethod('GET', apiIntegration, { authorizer });
-    paymentHistoryResource.addMethod('POST', apiIntegration, { authorizer });
-
-    // ==========================================
-    // SSL CERTIFICATE AND CLOUDFRONT
-    // ==========================================
-
-    let certificate: certificatemanager.ICertificate;
-    
-    if (props.certificateArn) {
-      certificate = certificatemanager.Certificate.fromCertificateArn(
-        this, 
-        'Certificate', 
-        props.certificateArn
-      );
-    } else {
-      // Create certificate in us-east-1 for CloudFront
-      certificate = new certificatemanager.Certificate(this, 'Certificate', {
-        domainName,
-        subjectAlternativeNames: [`www.${domainName}`],
-        validation: certificatemanager.CertificateValidation.fromDns(),
-      });
-    }
-
-    // CloudFront OAI
-    const originAccessIdentity = new cloudfront.OriginAccessIdentity(this, 'OAI', {
-      comment: `OAI for ${domainName}`,
-    });
-
-    websiteBucket.grantRead(originAccessIdentity);
-
-    // CloudFront Distribution
-    this.distribution = new cloudfront.Distribution(this, 'Distribution', {
-      domainNames: [domainName, `www.${domainName}`],
-      certificate,
-      minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
-      priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
-      defaultBehavior: {
-        origin: new origins.S3Origin(websiteBucket, {
-          originAccessIdentity,
-        }),
-        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-        allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
-        compress: true,
-        cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
-        responseHeadersPolicy: cloudfront.ResponseHeadersPolicy.SECURITY_HEADERS,
-      },
-      additionalBehaviors: {
-        '/api/*': {
-          origin: new origins.RestApiOrigin(this.api),
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-          originRequestPolicy: cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN,
-        },
-      },
-      defaultRootObject: 'index.html',
-      errorResponses: [
-        {
-          httpStatus: 404,
-          responseHttpStatus: 200,
-          responsePagePath: '/index.html',
-          ttl: cdk.Duration.minutes(5),
-        },
-        {
-          httpStatus: 403,
-          responseHttpStatus: 200,
-          responsePagePath: '/index.html',
-          ttl: cdk.Duration.minutes(5),
-        },
-      ],
-      comment: 'EHS Show Choir Payment System Distribution',
-    });
+    // Payments API endpoints
+    const paymentsResource = this.api.root.addResource('payments');
+    paymentsResource.addMethod('GET', new apigateway.LambdaIntegration(paymentsLambda));
+    paymentsResource.addMethod('POST', new apigateway.LambdaIntegration(paymentsLambda));
 
     // ==========================================
     // SES EMAIL CONFIGURATION
@@ -527,5 +328,69 @@ export class EhsShowchoirStack extends cdk.Stack {
     new ses.ConfigurationSet(this, 'ConfigurationSet', {
       configurationSetName: 'ehsshowchoir-emails',
     });
-  }  // Close constructor
-}    // Close class
+
+    // ==========================================
+    // REQUIRED OUTPUTS FOR FRONTEND DEPLOYMENT
+    // ==========================================
+
+    new CfnOutput(this, 'WebsiteBucketName', {
+      value: this.websiteBucket.bucketName,
+      description: 'Website S3 Bucket Name',
+      exportName: 'EhsShowchoir-WebsiteBucketName'
+    });
+
+    new CfnOutput(this, 'CloudFrontDistributionId', {
+      value: this.distribution.distributionId,
+      description: 'CloudFront Distribution ID',
+      exportName: 'EhsShowchoir-CloudFrontDistributionId'
+    });
+
+    new CfnOutput(this, 'ApiUrl', {
+      value: this.api.url,
+      description: 'API Gateway URL',
+      exportName: 'EhsShowchoir-ApiUrl'
+    });
+
+    new CfnOutput(this, 'UserPoolId', {
+      value: this.userPool.userPoolId,
+      description: 'Cognito User Pool ID',
+      exportName: 'EhsShowchoir-UserPoolId'
+    });
+
+    new CfnOutput(this, 'UserPoolClientId', {
+      value: this.userPoolClient.userPoolClientId,
+      description: 'Cognito User Pool Client ID',
+      exportName: 'EhsShowchoir-UserPoolClientId'
+    });
+
+    new CfnOutput(this, 'CognitoDomain', {
+      value: `https://${this.userPoolDomain.domainName}.auth.${this.region}.amazoncognito.com`,
+      description: 'Cognito Domain URL',
+      exportName: 'EhsShowchoir-CognitoDomain'
+    });
+
+    new CfnOutput(this, 'WebsiteUrl', {
+      value: `https://${this.distribution.distributionDomainName}`,
+      description: 'CloudFront Website URL (temporary)',
+      exportName: 'EhsShowchoir-WebsiteUrl'
+    });
+
+    new CfnOutput(this, 'CloudFrontUrl', {
+      value: `https://${this.distribution.distributionDomainName}`,
+      description: 'CloudFront Distribution URL',
+      exportName: 'EhsShowchoir-CloudFrontUrl'
+    });
+
+    new CfnOutput(this, 'Region', {
+      value: this.region,
+      description: 'AWS Region',
+      exportName: 'EhsShowchoir-Region'
+    });
+
+    new CfnOutput(this, 'StackName', {
+      value: this.stackName,
+      description: 'CloudFormation Stack Name',
+      exportName: 'EhsShowchoir-StackName'
+    });
+  }
+}
