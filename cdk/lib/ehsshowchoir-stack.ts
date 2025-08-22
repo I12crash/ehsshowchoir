@@ -51,18 +51,17 @@ export class EhsShowchoirStack extends Stack {
       removalPolicy: RemovalPolicy.RETAIN,
     });
 
-    // ==========================================
+// ==========================================
     // CLOUDFRONT DISTRIBUTION (WITHOUT SSL)
     // ==========================================
 
     this.distribution = new cloudfront.Distribution(this, 'Distribution', {
       defaultBehavior: {
-        origin: new origins.S3BucketOrigin(this.websiteBucket),
+        origin: new origins.S3Origin(this.websiteBucket),
         allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
       },
-      // Removed domainNames and certificate to avoid SSL validation delay
       defaultRootObject: 'index.html',
       errorResponses: [
         {
