@@ -1,0 +1,23 @@
+{
+  "name": "ehsshowchoir",
+  "version": "1.0.0",
+  "description": "Edgewood Show Choir Payment System - Complete AWS-based solution",
+  "main": "index.js",
+  "scripts": {
+    "install-all": "npm install && cd cdk && npm install && cd ../frontend && npm install && cd ..",
+    "build-all": "cd cdk && npm run build && cd ../frontend && npm run build && cd ..",
+    "deploy-infra": "./scripts/deploy-infra.sh",
+    "deploy-frontend": "./scripts/deploy-frontend.sh",
+    "deploy-all": "./scripts/deploy-all.sh",
+    "dev": "cd frontend && npm run dev",
+    "clean": "rm -rf node_modules cdk/node_modules frontend/node_modules cdk/lib/*.js cdk/lib/*.d.ts cdk.out frontend/dist",
+    "test": "cd cdk && npm test && cd ../frontend && npm run lint"
+  },
+  "keywords": ["aws", "cdk", "react", "show-choir", "payments", "edgewood"],
+  "author": "Edgewood Show Choir",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YourOrg/ehsshowchoir.git"
+  }
+}

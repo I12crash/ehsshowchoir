@@ -1,0 +1,13 @@
+{
+  "name": "ehsshowchoir-lambda",
+  "version": "1.0.0",
+  "description": "Lambda functions for EHS Show Choir Payment System",
+  "main": "index.js",
+  "dependencies": {
+    "aws-sdk": "^2.1000.0",
+    "uuid": "^9.0.0"
+  },
+  "scripts": {
+    "test": "echo \"No tests specified\""
+  }
+}
