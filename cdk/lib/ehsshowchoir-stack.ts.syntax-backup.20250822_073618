@@ -530,7 +530,33 @@ export class EhsShowchoirStack extends cdk.Stack {
 
     // ==========================================
 // Required outputs for frontend
-  }
-}
-  }
+    new CfnOutput(this, 'WebsiteBucketName', {
+      value: this.websiteBucket ? this.websiteBucket.bucketName : 'ehsshowchoir-website-bucket',
+      description: 'Website S3 Bucket Name'
+    });
+
+    new CfnOutput(this, 'CloudFrontDistributionId', {
+      value: this.distribution ? this.distribution.distributionId : 'MISSING_DISTRIBUTION',
+      description: 'CloudFront Distribution ID'
+    });
+
+    new CfnOutput(this, 'ApiUrl', {
+      value: this.api ? this.api.url : 'MISSING_API',
+      description: 'API Gateway URL'
+    });
+
+    new CfnOutput(this, 'UserPoolId', {
+      value: this.userPool ? this.userPool.userPoolId : 'MISSING_USER_POOL',
+      description: 'Cognito User Pool ID'
+    });
+
+    new CfnOutput(this, 'UserPoolClientId', {
+      value: this.userPoolClient ? this.userPoolClient.userPoolClientId : 'MISSING_CLIENT',
+      description: 'Cognito User Pool Client ID'
+    });
+
+    new CfnOutput(this, 'CognitoDomain', {
+      value: this.userPoolDomain ? this.userPoolDomain.domainName : 'MISSING_DOMAIN',
+      description: 'Cognito Domain'
+    });
 }

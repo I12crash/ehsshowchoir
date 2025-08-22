@@ -532,5 +532,3 @@ export class EhsShowchoirStack extends cdk.Stack {
 // Required outputs for frontend
   }
 }
-  }
-}
