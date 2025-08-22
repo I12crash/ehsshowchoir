@@ -1,4 +1,3 @@
-import { Stack, StackProps, CfnOutput } from 'aws-cdk-lib';
 import * as cdk from 'aws-cdk-lib';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
@@ -11,7 +10,7 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as ses from 'aws-cdk-lib/aws-ses';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
-import { CfnOutput, Construct } from 'constructs';
+import { Construct } from 'constructs';
 
 interface EhsShowchoirStackProps extends cdk.StackProps {
   domainName?: string;
@@ -529,34 +528,73 @@ export class EhsShowchoirStack extends cdk.Stack {
     });
 
     // ==========================================
-// Required outputs for frontend
-    new CfnOutput(this, 'WebsiteBucketName', {
-      value: this.websiteBucket ? this.websiteBucket.bucketName : 'ehsshowchoir-website-bucket',
-      description: 'Website S3 Bucket Name'
+    // STACK OUTPUTS
+    // ==========================================
+
+    new cdk.CfnOutput(this, 'WebsiteBucketName', {
+      value: websiteBucket.bucketName,
+      description: 'S3 Bucket for website hosting',
+      exportName: 'EhsShowchoir-WebsiteBucket',
     });
 
-    new CfnOutput(this, 'CloudFrontDistributionId', {
-      value: this.distribution ? this.distribution.distributionId : 'MISSING_DISTRIBUTION',
-      description: 'CloudFront Distribution ID'
+    new cdk.CfnOutput(this, 'InvoicesBucketName', {
+      value: invoicesBucket.bucketName,
+      description: 'S3 Bucket for invoice storage',
+      exportName: 'EhsShowchoir-InvoicesBucket',
     });
 
-    new CfnOutput(this, 'ApiUrl', {
-      value: this.api ? this.api.url : 'MISSING_API',
-      description: 'API Gateway URL'
+    new cdk.CfnOutput(this, 'CloudFrontDomainName', {
+      value: this.distribution.distributionDomainName,
+      description: 'CloudFront Distribution Domain Name',
+      exportName: 'EhsShowchoir-CloudFrontDomain',
     });
 
-    new CfnOutput(this, 'UserPoolId', {
-      value: this.userPool ? this.userPool.userPoolId : 'MISSING_USER_POOL',
-      description: 'Cognito User Pool ID'
+    new cdk.CfnOutput(this, 'CloudFrontDistributionId', {
+      value: this.distribution.distributionId,
+      description: 'CloudFront Distribution ID',
+      exportName: 'EhsShowchoir-DistributionId',
     });
 
-    new CfnOutput(this, 'UserPoolClientId', {
-      value: this.userPoolClient ? this.userPoolClient.userPoolClientId : 'MISSING_CLIENT',
-      description: 'Cognito User Pool Client ID'
+    new cdk.CfnOutput(this, 'ApiUrl', {
+      value: this.api.url,
+      description: 'API Gateway URL',
+      exportName: 'EhsShowchoir-ApiUrl',
     });
 
-    new CfnOutput(this, 'CognitoDomain', {
-      value: this.userPoolDomain ? this.userPoolDomain.domainName : 'MISSING_DOMAIN',
-      description: 'Cognito Domain'
+    new cdk.CfnOutput(this, 'UserPoolId', {
+      value: this.userPool.userPoolId,
+      description: 'Cognito User Pool ID',
+      exportName: 'EhsShowchoir-UserPoolId',
     });
+
+    new cdk.CfnOutput(this, 'UserPoolClientId', {
+      value: userPoolClient.userPoolClientId,
+      description: 'Cognito User Pool Client ID',
+      exportName: 'EhsShowchoir-UserPoolClientId',
+    });
+
+    new cdk.CfnOutput(this, 'CognitoDomain', {
+      value: userPoolDomain.domainName,
+      description: 'Cognito Hosted UI Domain',
+      exportName: 'EhsShowchoir-CognitoDomain',
+    });
+
+    new cdk.CfnOutput(this, 'CertificateArn', {
+      value: certificate.certificateArn,
+      description: 'SSL Certificate ARN',
+      exportName: 'EhsShowchoir-CertificateArn',
+    });
+
+    new cdk.CfnOutput(this, 'StudentsTableName', {
+      value: studentsTable.tableName,
+      description: 'DynamoDB Students Table Name',
+      exportName: 'EhsShowchoir-StudentsTable',
+    });
+
+    new cdk.CfnOutput(this, 'PaymentHistoryTableName', {
+      value: paymentHistoryTable.tableName,
+      description: 'DynamoDB Payment History Table Name',
+      exportName: 'EhsShowchoir-PaymentHistoryTable',
+    });
+  }
 }
