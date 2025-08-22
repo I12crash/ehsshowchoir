@@ -1,1 +1,10 @@
-{}
+{
+  "EhsShowchoirStack": {
+    "WebsiteBucketName": "ehsshowchoir-website-bucket",
+    "CloudFrontDistributionId": "E28FIO8DPYVPM2",
+    "ApiUrl": "https://cg4l3zqgai.execute-api.us-east-2.amazonaws.com/prod/",
+    "UserPoolId": "us-east-2_dvI4FFaeC",
+    "UserPoolClientId": "4srjsrfss2a2bsaak1g77ohios",
+    "CognitoDomain": "https://ehsshowchoir-auth.auth.us-east-2.amazoncognito.com"
+  }
+}

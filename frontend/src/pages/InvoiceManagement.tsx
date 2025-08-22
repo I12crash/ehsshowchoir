@@ -1,462 +1,195 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { get, post } from 'aws-amplify/api'
-import { 
-  Send, 
-  Download, 
-  Users, 
-  Calendar, 
-  FileText, 
-  CheckCircle, 
-  AlertCircle,
-  Clock,
-  Mail
-} from 'lucide-react'
+import type { Student, InvoiceData, BulkInvoiceResult, ApiResponse } from '../types'
 
-interface Student {
-  id: string
-  name: string
-  grade: string
-  parentEmail: string
-  status: string
-}
-
-interface PaymentHistoryItem {
-  id: string
-  date: string
-  amount: number
-  description: string
-  type: string
-  status: string
-}
-
-interface InvoiceData {
-  student: Student
-  currentCharges: PaymentHistoryItem[]
-  paymentHistory: PaymentHistoryItem[]
-  balanceDue: number
-  totalPaid: number
-}
-
-const InvoiceManagement: React.FC = () => {
+export default function InvoiceManagement() {
   const [students, setStudents] = useState<Student[]>([])
   const [selectedStudents, setSelectedStudents] = useState<string[]>([])
-  const [bulkInvoiceSettings, setBulkInvoiceSettings] = useState({
-    includeHistory: true,
-    dueDate: '',
-    invoiceDate: new Date().toISOString().split('T')[0]
-  })
-  const [isLoading, setIsLoading] = useState(false)
-  const [lastBulkResult, setLastBulkResult] = useState<any>(null)
-  const [selectedStudent, setSelectedStudent] = useState<string>('')
-  const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null)
-  const [isLoadingStudent, setIsLoadingStudent] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [lastBulkResult, setLastBulkResult] = useState<BulkInvoiceResult['results'] | null>(null)
 
   useEffect(() => {
-    loadStudents()
+    fetchStudents()
   }, [])
 
-  useEffect(() => {
-    if (selectedStudent) {
-      loadStudentInvoiceData(selectedStudent)
-    } else {
-      setInvoiceData(null)
-    }
-  }, [selectedStudent])
-
-  const loadStudents = async () => {
+  const fetchStudents = async () => {
     try {
       const response = await get({
-        apiName: 'ehsshowchoirApi',
+        apiName: 'ehsAPI',
         path: '/students'
       }).response
       
-      const studentsData = await response.body.json()
-      setStudents(studentsData || [])
-    } catch (error) {
-      console.error('Error loading students:', error)
-    }
-  }
-
-  const loadStudentInvoiceData = async (studentId: string) => {
-    setIsLoadingStudent(true)
-    try {
-      const response = await get({
-        apiName: 'ehsshowchoirApi',
-        path: `/students/${studentId}/invoice-data`
-      }).response
+      const result = await response.body.json() as ApiResponse<Student[]>
+      const studentsData = result.data
       
-      const data = await response.body.json()
-      setInvoiceData(data)
+      if (Array.isArray(studentsData)) {
+        setStudents(studentsData)
+      }
     } catch (error) {
-      console.error('Error loading student invoice data:', error)
+      console.error('Error fetching students:', error)
     } finally {
-      setIsLoadingStudent(false)
+      setLoading(false)
     }
   }
 
-  const handleBulkInvoiceSend = async () => {
-    if (!bulkInvoiceSettings.dueDate) {
-      alert('Please select a due date')
-      return
-    }
-
-    setIsLoading(true)
+  const generateBulkInvoices = async () => {
     try {
       const response = await post({
-        apiName: 'ehsshowchoirApi',
+        apiName: 'ehsAPI',
         path: '/invoices/bulk-send',
         options: {
           body: {
-            ...bulkInvoiceSettings,
-            selectedStudents: selectedStudents.length > 0 ? selectedStudents : undefined
+            selectedStudents,
+            includeHistory: true,
+            dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            invoiceDate: new Date().toISOString().split('T')[0],
           }
         }
       }).response
 
-      const result = await response.body.json()
-      setLastBulkResult(result.results)
+      const result = await response.body.json() as ApiResponse<BulkInvoiceResult>
       
-      const message = `Bulk invoice completed! ${result.results.successful} successful, ${result.results.failed} failed.`
-      alert(message)
+      if (result.data?.results) {
+        setLastBulkResult(result.data.results)
+        const message = `Bulk invoice completed! ${result.data.results.successful} successful, ${result.data.results.failed} failed.`
+        alert(message)
+      }
     } catch (error) {
-      console.error('Error sending bulk invoices:', error)
-      alert('Error sending bulk invoices. Please try again.')
-    } finally {
-      setIsLoading(false)
+      console.error('Error generating bulk invoices:', error)
+      alert('Error generating bulk invoices')
     }
   }
 
-  const generateIndividualInvoice = async () => {
-    if (!selectedStudent) return
-    
+  const generateIndividualInvoice = async (studentId: string) => {
     try {
       const response = await post({
-        apiName: 'ehsshowchoirApi',
+        apiName: 'ehsAPI',
         path: '/invoices/generate-individual',
         options: {
           body: {
-            studentId: selectedStudent,
-            includeHistory: true,
-            dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+            studentId,
+            dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            invoiceDate: new Date().toISOString().split('T')[0],
           }
         }
       }).response
 
-      const result = await response.body.json()
+      const result = await response.body.json() as ApiResponse<InvoiceData>
       
-      if (result.pdfUrl) {
-        window.open(result.pdfUrl, '_blank')
+      if (result.data?.pdfUrl) {
+        window.open(result.data.pdfUrl, '_blank')
+      } else {
+        alert('Invoice generated successfully')
       }
-      alert('Invoice generated successfully!')
     } catch (error) {
       console.error('Error generating individual invoice:', error)
-      alert('Error generating invoice. Please try again.')
+      alert('Error generating invoice')
     }
   }
 
-  const toggleStudentSelection = (studentId: string) => {
-    setSelectedStudents(prev => 
-      prev.includes(studentId) 
-        ? prev.filter(id => id !== studentId)
-        : [...prev, studentId]
-    )
-  }
-
-  const selectAllStudents = () => {
-    setSelectedStudents(students.map(s => s.id))
-  }
-
-  const clearSelection = () => {
-    setSelectedStudents([])
-  }
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount)
+  if (loading) {
+    return <div className="text-center py-8">Loading students...</div>
   }
 
   return (
-    <div className="invoice-management">
-      <div className="container">
-        <div className="page-header">
-          <h1 className="page-title">Invoice Management</h1>
-          <p className="page-subtitle">Send invoices to parents and manage payment collections</p>
-        </div>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-gray-900">Invoice Management</h1>
+      </div>
 
-        {/* Bulk Invoice Section */}
-        <div className="card-component">
-          <div className="card-header">
-            <h2 className="section-title">
-              <Mail size={24} />
-              Bulk Invoice Distribution
-            </h2>
-          </div>
-          
-          <div className="bulk-settings">
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="invoiceDate">
-                  <Calendar size={16} />
-                  Invoice Date:
+      <div className="bg-white shadow-md rounded-lg p-6">
+        <h2 className="text-lg font-medium text-gray-900 mb-4">Bulk Invoice Generation</h2>
+        
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Select Students
+            </label>
+            <div className="max-h-48 overflow-y-auto border border-gray-300 rounded-md p-2">
+              {students.map((student) => (
+                <label key={student.id} className="flex items-center space-x-2 p-1">
+                  <input
+                    type="checkbox"
+                    checked={selectedStudents.includes(student.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedStudents([...selectedStudents, student.id])
+                      } else {
+                        setSelectedStudents(selectedStudents.filter(id => id !== student.id))
+                      }
+                    }}
+                    className="rounded border-gray-300"
+                  />
+                  <span className="text-sm">
+                    {student.firstName} {student.lastName} - ${student.balance?.toFixed(2) || '0.00'}
+                  </span>
                 </label>
-                <input
-                  type="date"
-                  id="invoiceDate"
-                  value={bulkInvoiceSettings.invoiceDate}
-                  onChange={(e) => setBulkInvoiceSettings(prev => ({
-                    ...prev,
-                    invoiceDate: e.target.value
-                  }))}
-                  className="form-control"
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="dueDate">
-                  <Clock size={16} />
-                  Due Date: *
-                </label>
-                <input
-                  type="date"
-                  id="dueDate"
-                  value={bulkInvoiceSettings.dueDate}
-                  onChange={(e) => setBulkInvoiceSettings(prev => ({
-                    ...prev,
-                    dueDate: e.target.value
-                  }))}
-                  className="form-control"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={bulkInvoiceSettings.includeHistory}
-                  onChange={(e) => setBulkInvoiceSettings(prev => ({
-                    ...prev,
-                    includeHistory: e.target.checked
-                  }))}
-                />
-                Include full payment history in invoices
-              </label>
-            </div>
-          </div>
-
-          <div className="student-selection">
-            <div className="selection-controls">
-              <h3>
-                <Users size={20} />
-                Select Students (leave empty to send to all)
-              </h3>
-              <div className="action-buttons">
-                <button 
-                  onClick={selectAllStudents}
-                  className="btn btn-secondary btn-small"
-                  type="button"
-                >
-                  Select All
-                </button>
-                <button 
-                  onClick={clearSelection}
-                  className="btn btn-secondary btn-small"
-                  type="button"
-                >
-                  Clear Selection
-                </button>
-              </div>
-              <p className="selection-count">
-                {selectedStudents.length > 0 
-                  ? `${selectedStudents.length} students selected`
-                  : 'All students will receive invoices'
-                }
-              </p>
-            </div>
-
-            <div className="students-grid">
-              {students.map(student => (
-                <div 
-                  key={student.id} 
-                  className={`student-card ${selectedStudents.includes(student.id) ? 'selected' : ''}`}
-                  onClick={() => toggleStudentSelection(student.id)}
-                >
-                  <div className="student-info">
-                    <h4>{student.name}</h4>
-                    <p>Grade {student.grade}</p>
-                    <p className="parent-email">{student.parentEmail}</p>
-                  </div>
-                  <div className="selection-indicator">
-                    {selectedStudents.includes(student.id) && <CheckCircle size={20} />}
-                  </div>
-                </div>
               ))}
             </div>
           </div>
 
-          <div className="action-section">
-            <button
-              onClick={handleBulkInvoiceSend}
-              disabled={isLoading || !bulkInvoiceSettings.dueDate}
-              className="btn btn-primary btn-large"
-            >
-              {isLoading ? (
-                <>
-                  <div className="btn-spinner"></div>
-                  Sending Invoices...
-                </>
-              ) : (
-                <>
-                  <Send size={20} />
-                  Send Bulk Invoices
-                </>
-              )}
-            </button>
-          </div>
+          <button
+            onClick={generateBulkInvoices}
+            disabled={selectedStudents.length === 0}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+          >
+            Generate Bulk Invoices ({selectedStudents.length} selected)
+          </button>
 
           {lastBulkResult && (
-            <div className="bulk-result">
-              <h3>Last Bulk Invoice Results</h3>
-              <div className="result-stats">
-                <div className="stat-item success">
-                  <CheckCircle size={24} />
-                  <span className="stat-number">{lastBulkResult.successful}</span>
-                  <span className="stat-label">Successful</span>
-                </div>
-                <div className="stat-item error">
-                  <AlertCircle size={24} />
-                  <span className="stat-number">{lastBulkResult.failed}</span>
-                  <span className="stat-label">Failed</span>
-                </div>
-                <div className="stat-item total">
-                  <FileText size={24} />
-                  <span className="stat-number">{lastBulkResult.total}</span>
-                  <span className="stat-label">Total</span>
-                </div>
-              </div>
-              
-              {lastBulkResult.details && (
-                <details className="result-details">
-                  <summary>View Details</summary>
-                  <div className="result-list">
-                    {lastBulkResult.details.map((result: any, index: number) => (
-                      <div key={index} className={`result-item ${result.success ? 'success' : 'error'}`}>
-                        <span className="result-email">{result.parentEmail}</span>
-                        <span className="result-status">
-                          {result.success ? 'Sent' : 'Failed'}
-                        </span>
-                        {result.error && <span className="result-error">{result.error}</span>}
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Individual Student Invoice Section */}
-        <div className="card-component">
-          <div className="card-header">
-            <h2 className="section-title">
-              <FileText size={24} />
-              Individual Student Invoice
-            </h2>
-          </div>
-          
-          <div className="form-group">
-            <label htmlFor="studentSelect">Select Student:</label>
-            <select
-              id="studentSelect"
-              value={selectedStudent}
-              onChange={(e) => setSelectedStudent(e.target.value)}
-              className="form-control"
-            >
-              <option value="">Choose a student...</option>
-              {students.map(student => (
-                <option key={student.id} value={student.id}>
-                  {student.name} (Grade {student.grade})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {isLoadingStudent && (
-            <div className="loading-indicator">
-              <div className="spinner"></div>
-              <p>Loading student data...</p>
-            </div>
-          )}
-
-          {invoiceData && !isLoadingStudent && (
-            <div className="student-invoice-details">
-              <div className="student-header">
-                <h3>{invoiceData.student.name}</h3>
-                <p>Grade {invoiceData.student.grade} | {invoiceData.student.parentEmail}</p>
-              </div>
-
-              <div className="invoice-summary">
-                <div className="summary-card balance-due">
-                  <h4>Current Balance Due</h4>
-                  <span className="amount">{formatCurrency(invoiceData.balanceDue)}</span>
-                </div>
-                <div className="summary-card total-paid">
-                  <h4>Total Paid This Year</h4>
-                  <span className="amount">{formatCurrency(invoiceData.totalPaid)}</span>
-                </div>
-              </div>
-
-              {invoiceData.currentCharges.length > 0 && (
-                <div className="current-charges">
-                  <h4>Outstanding Charges</h4>
-                  <div className="charges-list">
-                    {invoiceData.currentCharges.map(charge => (
-                      <div key={charge.id} className="charge-item">
-                        <span className="charge-description">{charge.description}</span>
-                        <span className="charge-type">{charge.type}</span>
-                        <span className="charge-amount">{formatCurrency(charge.amount)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {invoiceData.paymentHistory.length > 0 && (
-                <div className="payment-history">
-                  <h4>Recent Payment History</h4>
-                  <div className="history-list">
-                    {invoiceData.paymentHistory.slice(0, 10).map(payment => (
-                      <div key={payment.id} className="payment-item">
-                        <span className="payment-date">
-                          {new Date(payment.date).toLocaleDateString()}
-                        </span>
-                        <span className="payment-description">{payment.description}</span>
-                        <span className="payment-type">{payment.type}</span>
-                        <span className="payment-amount">{formatCurrency(payment.amount)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="actions">
-                <button
-                  onClick={generateIndividualInvoice}
-                  className="btn btn-primary"
-                >
-                  <Download size={16} />
-                  Generate & Download Invoice
-                </button>
-              </div>
+            <div className="mt-4 p-4 bg-gray-50 rounded-md">
+              <h3 className="font-medium text-gray-900">Last Bulk Result:</h3>
+              <p className="text-sm text-gray-600">
+                Successful: {lastBulkResult.successful}, Failed: {lastBulkResult.failed}
+              </p>
             </div>
           )}
         </div>
       </div>
+
+      <div className="bg-white shadow-md rounded-lg overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-medium text-gray-900">Individual Invoices</h2>
+        </div>
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Student
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Balance
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {students.map((student) => (
+              <tr key={student.id}>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="font-medium text-gray-900">
+                    {student.firstName} {student.lastName}
+                  </div>
+                  <div className="text-sm text-gray-500">{student.email}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-gray-900">
+                  ${student.balance?.toFixed(2) || '0.00'}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <button
+                    onClick={() => generateIndividualInvoice(student.id)}
+                    className="text-blue-600 hover:text-blue-900"
+                  >
+                    Generate Invoice
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
-
-export default InvoiceManagement

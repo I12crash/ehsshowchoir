@@ -60,7 +60,7 @@ const Dashboard: React.FC = () => {
       const students = await studentsResponse.body.json()
       
       // Calculate basic stats
-      const totalStudents = Array.isArray(students) ? students.length : 0
+      const totalStudents = students?.length || 0
       
       // Mock additional stats for now
       const mockStats = {

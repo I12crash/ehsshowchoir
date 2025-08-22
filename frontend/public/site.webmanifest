@@ -1,0 +1,16 @@
+{
+  "name": "EHS Show Choir Payment System",
+  "short_name": "EHS ShowChoir",
+  "description": "Payment management system for EHS Show Choir",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ]
+}

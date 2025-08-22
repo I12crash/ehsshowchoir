@@ -1,502 +1,301 @@
 import React, { useState, useEffect } from 'react'
 import { get, post, put, del } from 'aws-amplify/api'
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Search, 
-  Filter, 
-  Users, 
-  Mail,
-  GraduationCap,
-  AlertCircle,
-  CheckCircle
-} from 'lucide-react'
+import type { Student, ApiResponse } from '../types'
 
-interface Student {
-  id: string
-  name: string
-  grade: string
-  parentEmail: string
-  status: string
-  createdAt: string
-  updatedAt?: string
-}
-
-const StudentManagement: React.FC = () => {
+export default function StudentManagement() {
   const [students, setStudents] = useState<Student[]>([])
-  const [filteredStudents, setFilteredStudents] = useState<Student[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [showAddForm, setShowAddForm] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [showModal, setShowModal] = useState(false)
   const [editingStudent, setEditingStudent] = useState<Student | null>(null)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [gradeFilter, setGradeFilter] = useState('all')
-  
-  const [newStudent, setNewStudent] = useState({
-    name: '',
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
     grade: '',
-    parentEmail: ''
+    parentEmail: '',
+    parentName: ''
   })
 
   useEffect(() => {
-    loadStudents()
+    fetchStudents()
   }, [])
 
-  useEffect(() => {
-    filterStudents()
-  }, [students, searchTerm, statusFilter, gradeFilter])
-
-  const loadStudents = async () => {
+  const fetchStudents = async () => {
     try {
       const response = await get({
-        apiName: 'ehsshowchoirApi',
+        apiName: 'ehsAPI',
         path: '/students'
       }).response
       
-      const studentsData = await response.body.json()
-      setStudents(studentsData || [])
+      const result = await response.body.json() as ApiResponse<Student[]>
+      const studentsData = result.data || []
+      
+      if (Array.isArray(studentsData)) {
+        setStudents(studentsData)
+      }
     } catch (error) {
-      console.error('Error loading students:', error)
+      console.error('Error fetching students:', error)
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
-  const filterStudents = () => {
-    let filtered = students
-
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(student => 
-        student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.parentEmail.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    }
-
-    // Status filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(student => student.status === statusFilter)
-    }
-
-    // Grade filter
-    if (gradeFilter !== 'all') {
-      filtered = filtered.filter(student => student.grade === gradeFilter)
-    }
-
-    setFilteredStudents(filtered)
-  }
-
-  const handleAddStudent = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!newStudent.name || !newStudent.grade || !newStudent.parentEmail) {
-      alert('Please fill in all fields')
-      return
-    }
-
     try {
-      const response = await post({
-        apiName: 'ehsshowchoirApi',
-        path: '/students',
-        options: {
-          body: newStudent
-        }
-      }).response
-
-      const createdStudent = await response.body.json()
-      setStudents([...students, createdStudent])
-      setNewStudent({ name: '', grade: '', parentEmail: '' })
-      setShowAddForm(false)
-    } catch (error) {
-      console.error('Error adding student:', error)
-      alert('Error adding student. Please try again.')
-    }
-  }
-
-  const handleEditStudent = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!editingStudent) return
-
-    try {
-      const response = await put({
-        apiName: 'ehsshowchoirApi',
-        path: `/students/${editingStudent.id}`,
-        options: {
-          body: {
-            name: editingStudent.name,
-            grade: editingStudent.grade,
-            parentEmail: editingStudent.parentEmail,
-            status: editingStudent.status
+      if (editingStudent) {
+        const response = await put({
+          apiName: 'ehsAPI',
+          path: `/students/${editingStudent.id}`,
+          options: {
+            body: formData
           }
+        }).response
+        
+        const result = await response.body.json() as ApiResponse<Student>
+        const updatedStudent = result.data
+        
+        if (updatedStudent) {
+          setStudents(students.map(s => s.id === updatedStudent.id ? updatedStudent : s))
         }
-      }).response
-
-      const updatedStudent = await response.body.json()
-      setStudents(students.map(s => s.id === updatedStudent.id ? updatedStudent : s))
+      } else {
+        const response = await post({
+          apiName: 'ehsAPI',
+          path: '/students',
+          options: {
+            body: formData
+          }
+        }).response
+        
+        const result = await response.body.json() as ApiResponse<Student>
+        const createdStudent = result.data
+        
+        if (createdStudent) {
+          setStudents([...students, createdStudent])
+        }
+      }
+      
+      setShowModal(false)
       setEditingStudent(null)
+      setFormData({
+        firstName: '',
+        lastName: '',
+        email: '',
+        grade: '',
+        parentEmail: '',
+        parentName: ''
+      })
     } catch (error) {
-      console.error('Error updating student:', error)
-      alert('Error updating student. Please try again.')
+      console.error('Error saving student:', error)
     }
   }
 
-  const handleDeleteStudent = async (studentId: string, studentName: string) => {
-    if (!window.confirm(`Are you sure you want to delete ${studentName}? This action cannot be undone.`)) {
-      return
-    }
+  const handleEdit = (student: Student) => {
+    setEditingStudent(student)
+    setFormData({
+      firstName: student.firstName,
+      lastName: student.lastName,
+      email: student.email,
+      grade: student.grade,
+      parentEmail: student.parentEmail,
+      parentName: student.parentName
+    })
+    setShowModal(true)
+  }
+
+  const handleDelete = async (studentId: string) => {
+    if (!confirm('Are you sure you want to delete this student?')) return
     
     try {
       await del({
-        apiName: 'ehsshowchoirApi',
+        apiName: 'ehsAPI',
         path: `/students/${studentId}`
       }).response
-
+      
       setStudents(students.filter(s => s.id !== studentId))
     } catch (error) {
       console.error('Error deleting student:', error)
-      alert('Error deleting student. Please try again.')
     }
   }
 
-  const getUniqueGrades = () => {
-    const grades = [...new Set(students.map(s => s.grade))].sort()
-    return grades
-  }
-
-  if (isLoading) {
-    return (
-      <div className="student-management">
-        <div className="container">
-          <div className="loading-indicator">
-            <div className="spinner"></div>
-            <p>Loading students...</p>
-          </div>
-        </div>
-      </div>
-    )
+  if (loading) {
+    return <div className="text-center py-8">Loading students...</div>
   }
 
   return (
-    <div className="student-management">
-      <div className="container">
-        <div className="page-header">
-          <div className="page-header-content">
-            <h1 className="page-title">
-              <Users size={32} />
-              Student Management
-            </h1>
-            <p className="page-subtitle">Manage student records and contact information</p>
-          </div>
-          <button 
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="btn btn-primary"
-          >
-            <Plus size={20} />
-            {showAddForm ? 'Cancel' : 'Add Student'}
-          </button>
-        </div>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-gray-900">Student Management</h1>
+        <button
+          onClick={() => setShowModal(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+        >
+          Add Student
+        </button>
+      </div>
 
-        {/* Filters and Search */}
-        <div className="card-component">
-          <div className="filters-section">
-            <div className="search-group">
-              <div className="search-input">
-                <Search size={20} />
+      <div className="bg-white shadow-md rounded-lg overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Name
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Email
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Grade
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Parent
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Balance
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {students.map((student) => (
+              <tr key={student.id}>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="font-medium text-gray-900">
+                    {student.firstName} {student.lastName}
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-gray-900">
+                  {student.email}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-gray-900">
+                  {student.grade}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-gray-900">
+                  {student.parentName}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-gray-900">
+                  ${student.balance?.toFixed(2) || '0.00'}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                  <button
+                    onClick={() => handleEdit(student)}
+                    className="text-blue-600 hover:text-blue-900"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(student.id)}
+                    className="text-red-600 hover:text-red-900"
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">
+              {editingStudent ? 'Edit Student' : 'Add Student'}
+            </h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">First Name</label>
                 <input
                   type="text"
-                  placeholder="Search by name or email..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="form-control"
+                  required
+                  value={formData.firstName}
+                  onChange={(e) => setFormData({...formData, firstName: e.target.value})}
+                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
                 />
               </div>
-            </div>
-
-            <div className="filter-group">
-              <Filter size={16} />
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="form-control"
-              >
-                <option value="all">All Statuses</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </div>
-
-            <div className="filter-group">
-              <GraduationCap size={16} />
-              <select
-                value={gradeFilter}
-                onChange={(e) => setGradeFilter(e.target.value)}
-                className="form-control"
-              >
-                <option value="all">All Grades</option>
-                {getUniqueGrades().map(grade => (
-                  <option key={grade} value={grade}>Grade {grade}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="filter-results">
-              <span className="results-count">
-                {filteredStudents.length} of {students.length} students
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Add Student Form */}
-        {showAddForm && (
-          <div className="card-component">
-            <h2 className="section-title">Add New Student</h2>
-            <form onSubmit={handleAddStudent} className="add-student-form">
-              <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="name">Student Name: *</label>
-                  <input
-                    type="text"
-                    id="name"
-                    value={newStudent.name}
-                    onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
-                    className="form-control"
-                    placeholder="Enter full name"
-                    required
-                  />
-                </div>
-                
-                <div className="form-group">
-                  <label htmlFor="grade">Grade: *</label>
-                  <select
-                    id="grade"
-                    value={newStudent.grade}
-                    onChange={(e) => setNewStudent({ ...newStudent, grade: e.target.value })}
-                    className="form-control"
-                    required
-                  >
-                    <option value="">Select Grade</option>
-                    <option value="9">9th Grade</option>
-                    <option value="10">10th Grade</option>
-                    <option value="11">11th Grade</option>
-                    <option value="12">12th Grade</option>
-                  </select>
-                </div>
-                
-                <div className="form-group">
-                  <label htmlFor="parentEmail">Parent Email: *</label>
-                  <input
-                    type="email"
-                    id="parentEmail"
-                    value={newStudent.parentEmail}
-                    onChange={(e) => setNewStudent({ ...newStudent, parentEmail: e.target.value })}
-                    className="form-control"
-                    placeholder="parent@example.com"
-                    required
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Last Name</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.lastName}
+                  onChange={(e) => setFormData({...formData, lastName: e.target.value})}
+                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                />
               </div>
-              
-              <div className="form-actions">
-                <button type="submit" className="btn btn-primary">
-                  <Plus size={16} />
-                  Add Student
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Email</label>
+                <input
+                  type="email"
+                  required
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Grade</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.grade}
+                  onChange={(e) => setFormData({...formData, grade: e.target.value})}
+                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Parent Name</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.parentName}
+                  onChange={(e) => setFormData({...formData, parentName: e.target.value})}
+                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Parent Email</label>
+                <input
+                  type="email"
+                  required
+                  value={formData.parentEmail}
+                  onChange={(e) => setFormData({...formData, parentEmail: e.target.value})}
+                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                />
+              </div>
+              <div className="flex space-x-3 pt-4">
+                <button
+                  type="submit"
+                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700"
+                >
+                  {editingStudent ? 'Update' : 'Create'}
                 </button>
-                <button 
-                  type="button" 
-                  onClick={() => setShowAddForm(false)}
-                  className="btn btn-secondary"
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowModal(false)
+                    setEditingStudent(null)
+                    setFormData({
+                      firstName: '',
+                      lastName: '',
+                      email: '',
+                      grade: '',
+                      parentEmail: '',
+                      parentName: ''
+                    })
+                  }}
+                  className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400"
                 >
                   Cancel
                 </button>
               </div>
             </form>
           </div>
-        )}
-
-        {/* Edit Student Modal */}
-        {editingStudent && (
-          <div className="modal-overlay">
-            <div className="modal-content">
-              <h2>Edit Student</h2>
-              <form onSubmit={handleEditStudent}>
-                <div className="form-group">
-                  <label htmlFor="editName">Student Name:</label>
-                  <input
-                    type="text"
-                    id="editName"
-                    value={editingStudent.name}
-                    onChange={(e) => setEditingStudent({ ...editingStudent, name: e.target.value })}
-                    className="form-control"
-                    required
-                  />
-                </div>
-                
-                <div className="form-group">
-                  <label htmlFor="editGrade">Grade:</label>
-                  <select
-                    id="editGrade"
-                    value={editingStudent.grade}
-                    onChange={(e) => setEditingStudent({ ...editingStudent, grade: e.target.value })}
-                    className="form-control"
-                    required
-                  >
-                    <option value="9">9th Grade</option>
-                    <option value="10">10th Grade</option>
-                    <option value="11">11th Grade</option>
-                    <option value="12">12th Grade</option>
-                  </select>
-                </div>
-                
-                <div className="form-group">
-                  <label htmlFor="editParentEmail">Parent Email:</label>
-                  <input
-                    type="email"
-                    id="editParentEmail"
-                    value={editingStudent.parentEmail}
-                    onChange={(e) => setEditingStudent({ ...editingStudent, parentEmail: e.target.value })}
-                    className="form-control"
-                    required
-                  />
-                </div>
-                
-                <div className="form-group">
-                  <label htmlFor="editStatus">Status:</label>
-                  <select
-                    id="editStatus"
-                    value={editingStudent.status}
-                    onChange={(e) => setEditingStudent({ ...editingStudent, status: e.target.value })}
-                    className="form-control"
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
-                
-                <div className="modal-actions">
-                  <button type="submit" className="btn btn-primary">
-                    <CheckCircle size={16} />
-                    Save Changes
-                  </button>
-                  <button 
-                    type="button" 
-                    onClick={() => setEditingStudent(null)}
-                    className="btn btn-secondary"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Students Table */}
-        <div className="card-component">
-          <h2 className="section-title">Students ({filteredStudents.length})</h2>
-          
-          {filteredStudents.length === 0 ? (
-            <div className="empty-state">
-              <Users size={48} />
-              <h3>No students found</h3>
-              <p>
-                {students.length === 0 
-                  ? 'Add your first student to get started.'
-                  : 'Try adjusting your search or filter criteria.'
-                }
-              </p>
-              {students.length === 0 && (
-                <button 
-                  onClick={() => setShowAddForm(true)}
-                  className="btn btn-primary"
-                >
-                  <Plus size={16} />
-                  Add First Student
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="students-table-container">
-              <table className="students-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Grade</th>
-                    <th>Parent Email</th>
-                    <th>Status</th>
-                    <th>Added</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredStudents.map(student => (
-                    <tr key={student.id}>
-                      <td>
-                        <div className="student-name">
-                          <strong>{student.name}</strong>
-                        </div>
-                      </td>
-                      <td>
-                        <span className="grade-badge">
-                          Grade {student.grade}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="email-cell">
-                          <Mail size={14} />
-                          {student.parentEmail}
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`status-badge ${student.status}`}>
-                          {student.status === 'active' ? (
-                            <CheckCircle size={14} />
-                          ) : (
-                            <AlertCircle size={14} />
-                          )}
-                          {student.status}
-                        </span>
-                      </td>
-                      <td>
-                        {new Date(student.createdAt).toLocaleDateString()}
-                      </td>
-                      <td>
-                        <div className="action-buttons">
-                          <button
-                            onClick={() => setEditingStudent(student)}
-                            className="btn btn-small btn-secondary"
-                            title="Edit Student"
-                          >
-                            <Edit size={14} />
-                          </button>
-                          <a 
-                            href={`/invoices?student=${student.id}`}
-                            className="btn btn-small btn-outline"
-                            title="View Invoice"
-                          >
-                            View Invoice
-                          </a>
-                          <button
-                            onClick={() => handleDeleteStudent(student.id, student.name)}
-                            className="btn btn-small btn-danger"
-                            title="Delete Student"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
-      </div>
+      )}
     </div>
   )
 }
-
-export default StudentManagement

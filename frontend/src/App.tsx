@@ -1,82 +1,86 @@
 import React from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { Authenticator } from '@aws-amplify/ui-react'
-import '@aws-amplify/ui-react/styles.css'
-
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { getCurrentUser, type AuthUser } from 'aws-amplify/auth'
+import { signOut } from 'aws-amplify/auth'
+import { Hub } from 'aws-amplify/utils'
 import Header from './components/Header'
-import Footer from './components/Footer'
+import Navigation from './components/Navigation'
 import Dashboard from './pages/Dashboard'
-import InvoiceManagement from './pages/InvoiceManagement'
 import StudentManagement from './pages/StudentManagement'
 import PaymentHistory from './pages/PaymentHistory'
-import Settings from './pages/Settings'
+import InvoiceManagement from './pages/InvoiceManagement'
+import Login from './pages/Login'
+import './App.css'
 
-import './styles/App.css'
+function App() {
+  const [user, setUser] = React.useState<AuthUser | null>(null)
+  const [loading, setLoading] = React.useState(true)
 
-// Custom Authenticator components
-const components = {
-  Header() {
-    return (
-      <div className="auth-header">
-        <h1>Edgewood Show Choir</h1>
-        <p>Payment Portal</p>
-      </div>
-    );
-  },
-};
+  React.useEffect(() => {
+    checkUser()
 
-const formFields = {
-  signIn: {
-    username: {
-      placeholder: 'Enter your email',
-      label: 'Email *',
-      inputProps: { type: 'email', autoComplete: 'email' }
-    }
-  },
-  signUp: {
-    email: {
-      placeholder: 'Enter your email',
-      label: 'Email *',
-      inputProps: { type: 'email', autoComplete: 'email' }
-    },
-    given_name: {
-      placeholder: 'Enter your first name',
-      label: 'First Name *'
-    },
-    family_name: {
-      placeholder: 'Enter your last name',
-      label: 'Last Name *'
+    const unsubscribe = Hub.listen('auth', ({ payload }) => {
+      switch (payload.event) {
+        case 'signedIn':
+          checkUser()
+          break
+        case 'signedOut':
+          setUser(null)
+          break
+      }
+    })
+
+    return unsubscribe
+  }, [])
+
+  async function checkUser() {
+    try {
+      const currentUser = await getCurrentUser()
+      setUser(currentUser)
+    } catch (error) {
+      setUser(null)
+    } finally {
+      setLoading(false)
     }
   }
-};
 
-const App: React.FC = () => {
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+    } catch (error) {
+      console.error('Error signing out:', error)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-xl">Loading...</div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <Login />
+  }
+
   return (
-    <Authenticator 
-      components={components}
-      formFields={formFields}
-      signUpAttributes={['email', 'given_name', 'family_name']}
-    >
-      {({ signOut, user }) => (
-        <Router>
-          <div className="app">
-            <Header user={user} signOut={signOut} />
-            <main className="main-content">
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/dashboard" element={<Navigate to="/" replace />} />
-                <Route path="/invoices" element={<InvoiceManagement />} />
-                <Route path="/students" element={<StudentManagement />} />
-                <Route path="/payments" element={<PaymentHistory />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </main>
-            <Footer />
-          </div>
-        </Router>
-      )}
-    </Authenticator>
+    <Router>
+      <div className="min-h-screen bg-gray-50">
+        <Header user={user} signOut={handleSignOut} />
+        <div className="flex">
+          <Navigation />
+          <main className="flex-1 p-6">
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/students" element={<StudentManagement />} />
+              <Route path="/payments" element={<PaymentHistory />} />
+              <Route path="/invoices" element={<InvoiceManagement />} />
+            </Routes>
+          </main>
+        </div>
+      </div>
+    </Router>
   )
 }
 

@@ -23,7 +23,7 @@
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::636865837466:role/cdk-hnb659fds-deploy-role-636865837466-us-east-2",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::636865837466:role/cdk-hnb659fds-cfn-exec-role-636865837466-us-east-2",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-636865837466-us-east-2/103614c154d705cf81c648fb72fe7a65428daf25efaa4e394869d70d61489ba2.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-636865837466-us-east-2/5eff879449390e0f79346a3e69e8f062f337b361fde29e1a46ac8799fa7e556a.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -98,12 +98,6 @@
           {
             "type": "aws:cdk:logicalId",
             "data": "InvoicesBucket57FCB164"
-          }
-        ],
-        "/EhsShowchoirStack/Certificate/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "Certificate4E7ABB08"
           }
         ],
         "/EhsShowchoirStack/Distribution/Resource": [

@@ -1,0 +1,81 @@
+.App {
+  text-align: center;
+}
+
+.App-header {
+  background-color: #282c34;
+  padding: 20px;
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+/* EHS Show Choir specific styles */
+.header {
+  @apply bg-white shadow-sm border-b border-gray-200;
+}
+
+.sidebar {
+  @apply w-64 bg-white shadow-lg;
+}
+
+.main-content {
+  @apply flex-1 p-6 bg-gray-50;
+}
+
+.page-header {
+  @apply flex justify-between items-center mb-6;
+}
+
+.page-title {
+  @apply text-2xl font-bold text-gray-900;
+}
+
+/* Form layouts */
+.form-grid {
+  @apply grid grid-cols-1 gap-6 sm:grid-cols-2;
+}
+
+.form-section {
+  @apply space-y-4;
+}
+
+.form-group {
+  @apply space-y-1;
+}
+
+.form-label {
+  @apply block text-sm font-medium text-gray-700;
+}
+
+/* Button groups */
+.button-group {
+  @apply flex space-x-3;
+}
+
+.button-group-vertical {
+  @apply flex flex-col space-y-2;
+}
+
+/* Alert styles */
+.alert {
+  @apply p-4 rounded-md;
+}
+
+.alert-success {
+  @apply bg-green-100 border border-green-400 text-green-700;
+}
+
+.alert-error {
+  @apply bg-red-100 border border-red-400 text-red-700;
+}
+
+.alert-warning {
+  @apply bg-yellow-100 border border-yellow-400 text-yellow-700;
+}
+
+.alert-info {
+  @apply bg-blue-100 border border-blue-400 text-blue-700;
+}

@@ -211,30 +211,11 @@
     "aws:cdk:path": "EhsShowchoirStack/InvoicesBucket/Resource"
    }
   },
-  "Certificate4E7ABB08": {
-   "Type": "AWS::CertificateManager::Certificate",
-   "Properties": {
-    "DomainName": "edgewoodshowchoirpayments.org",
-    "Tags": [
-     {
-      "Key": "Name",
-      "Value": "EhsShowchoirStack/Certificate"
-     }
-    ],
-    "ValidationMethod": "DNS"
-   },
-   "Metadata": {
-    "aws:cdk:path": "EhsShowchoirStack/Certificate/Resource"
-   }
-  },
   "Distribution830FAC52": {
    "Type": "AWS::CloudFront::Distribution",
    "Properties": {
     "DistributionConfig": {
-     "Aliases": [
-      "edgewoodshowchoirpayments.org"
-     ],
-     "Comment": "EHS Show Choir Payment System Distribution",
+     "Comment": "EHS Show Choir Payment System Distribution (No Custom Domain)",
      "CustomErrorResponses": [
       {
        "ErrorCode": 404,
@@ -283,14 +264,7 @@
        },
        "Id": "EhsShowchoirStackDistributionOrigin1EE09CE1D"
       }
-     ],
-     "ViewerCertificate": {
-      "AcmCertificateArn": {
-       "Ref": "Certificate4E7ABB08"
-      },
-      "MinimumProtocolVersion": "TLSv1.2_2021",
-      "SslSupportMethod": "sni-only"
-     }
+     ]
     }
    },
    "Metadata": {
@@ -1669,7 +1643,7 @@
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
-    "Analytics": "v2:deflate64:H4sIAAAAAAAA/21Sy07DMBD8Fu6ugQAf0AdIHBBRC2fkxNuwre2N/GgVWfl3nBcNFaedndnMjrXJeHaf8bsbcXaLUh4XCgsed16UR5aor+geeFyF8gierfdmREPJSWHZXOihb1kJ1uMeS+FBCyMqsDyuL1z3waxN84qC3FsynscNOm+xCB7JdIPzvmWyMUKTTAk/RKF6px4kD6oMeuLx04HNiVSn/eIJrBWC8XNpZKZ2Q1qgmQ8MTMtQaB63NCztasuU0IUUPL4EU0555zgHq9G5PrmosUqPPYsmuYDzyxp7oxFuoFbU6DHcrEuXqPqVA0jzFGwJK+GAvYH/JtmJI5rU0bnHLXPgeHxOr1CvMlmi7092RZDZYxWs6LLvhltfc23L1sF50v+tuZJySyeUYPucS+fAd/nRVH8yvgdfB98yQxL4wd2eskf+lP7Fg0Nc2JCiaeDbof4AC+dRaqgCAAA="
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/21Sy07DMBD8Fu6ugQAfUFqQOCCiFs7IjbdhW9sb+dEqsvzvOC8IFaednVnNjh8FL24LfnMlzm5RyeNC4Y7HrRfVkWXqM7o7Hh9DdQTPVnszoqGUpLBqf+mhT6xSFOTekvE8rtF5i7vgkUw3Oe8Tk60RmmTe+C52CrqBHmQPqg164vHDgS2JVKf94AmsFILxc2lkpnZNWqCZDwxMYig0jxsalnY1MSX0Tgoen4OpprxzXILV6FyfXDRYCw9n0WYXcH7ZYG80wjU0ilo9hpt1+WbrfuUA8jwFW8GjcMBewX+R7MQRTero3OPEHDgen/Ip1IvMluj7J7ggyOyxDlZ02bfD211yKbFVcJ70f2supNLSCSXYPufSOfBdfjT1n4xvwTfBJ2ZIAj+461Nxzx/y3zo4xIUNOZoGvhnqN7NqTJZ4AgAA"
    },
    "Metadata": {
     "aws:cdk:path": "EhsShowchoirStack/CDKMetadata/Default"
@@ -1780,8 +1754,21 @@
    }
   },
   "WebsiteUrl": {
-   "Description": "Website URL",
-   "Value": "https://edgewoodshowchoirpayments.org",
+   "Description": "CloudFront Website URL (temporary)",
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "https://",
+      {
+       "Fn::GetAtt": [
+        "Distribution830FAC52",
+        "DomainName"
+       ]
+      }
+     ]
+    ]
+   },
    "Export": {
     "Name": "EhsShowchoir-WebsiteUrl"
    }
