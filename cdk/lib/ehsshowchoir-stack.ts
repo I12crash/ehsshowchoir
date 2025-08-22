@@ -527,10 +527,5 @@ export class EhsShowchoirStack extends cdk.Stack {
     new ses.ConfigurationSet(this, 'ConfigurationSet', {
       configurationSetName: 'ehsshowchoir-emails',
     });
-
-    // ==========================================
-// Required outputs for frontend
-  }
-}
-  }
-}
+  }  // Close constructor
+}    // Close class
